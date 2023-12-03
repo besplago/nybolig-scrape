@@ -9,7 +9,7 @@ config_file_path = Path("config.json")
 if not config_file_path.is_file():
     raise FileNotFoundError("Configuration file not found.")
 
-with open(config_file_path, "r") as config_file:
+with open(config_file_path, "r", encoding="utf-8") as config_file:
     config = json.load(config_file)
 
 URL = config["url"]
@@ -57,13 +57,12 @@ def _extract_bolig_data(bolig_url: str) -> tuple:
     return bolig_data, image_urls
 
 
-def _create_bolig_folder(address: str) -> None:
-    bolig_folder = Path(OUTPUT_PATH) / address
+def _create_bolig_folder(bolig_folder: Path) -> None:
     bolig_folder.mkdir(parents=True, exist_ok=True)
 
 
 def _save_data_and_images(bolig_folder: Path, bolig_data: dict, images: list) -> None:
-    with open(bolig_folder / 'data.json', 'w') as f:
+    with open(bolig_folder / 'data.json', 'w', encoding='utf-8') as f:
         json.dump(bolig_data, f, indent=4)
 
     for i, image_url in enumerate(images):
@@ -87,7 +86,7 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
     a_tag = bolig.find('a', class_='tile__image-container')
     bolig_url = URL + a_tag['href']
 
-    bolig_folder = Path(OUTPUT_PATH) / address_paragraph.text
+    bolig_folder = Path(OUTPUT_PATH).joinpath(address_paragraph.text)
     _create_bolig_folder(bolig_folder)
 
     try:
@@ -176,6 +175,7 @@ def _check_bolig_type(bolig: BeautifulSoup) -> bool:
     if bolig_type in BOLIG_TYPES:
         return BOLIG_TYPES[bolig_type]
     else:
+        print(BOLIG_TYPES)
         print(f"Unknown bolig type: {bolig_type}")
         return False
 
@@ -187,13 +187,7 @@ def _get_pages(pages: int) -> int:
     return pages
 
 
-def _check_output_path() -> None:
-    if not os.path.exists(OUTPUT_PATH):
-        os.mkdir(OUTPUT_PATH)
-
-
 def main():
-    _check_output_path()
     _start_scraping(PAGES)
 
 
