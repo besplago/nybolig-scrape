@@ -12,6 +12,7 @@ This project is designed to scrape data, floor plans, and images from the Nyboli
 
 ## Configuration
 Adjust the settings in the `config.json` file to customize the scraper behavior. You can find the configuration file [here](./config.json).
+**Note**: if `"include_images = true"`, the scraper will download all images. This can take a long time and consume a lot of disk space.
 
 ## Usage
 Once you've configured the settings, you can run the scraper using the following command:
