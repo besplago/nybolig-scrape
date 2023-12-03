@@ -4,34 +4,26 @@ import json
 import os
 from pathlib import Path
 
-# Settings
-OUTPUT_PATH = './output'
-PAGES = 1  # Amount of pages to scrape
-INCLUDE_IMAGES = True  # Is very slow if set to True
-BOLIG_TYPES = {  # Which bolig types to include
-    'villa': True,
-    'rækkehus': True,
-    'ejerlejlighed': True,
-    'fritidsbolig': True,
-    'andelsbolig': True,
-    'villalejlighed': True,
-    'landejendom': False,
-    'helårsgrund': False,
-    'fritidsgrund': False,
-}
+# Load configuration from file
+config_file_path = Path("config.json")
+if not config_file_path.is_file():
+    raise FileNotFoundError("Configuration file not found.")
 
-# Constants
-URL = 'https://www.nybolig.dk'
-MAX_PAGES = 2404
-HTML_PARSER = 'lxml'
-LISTING_CLASS = 'list__item'
-USER_AGENT = (
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3 Edge/16.16299'
-)
+with open(config_file_path, "r") as config_file:
+    config = json.load(config_file)
+
+URL = config["url"]
+PAGES = config["pages"]
+INCLUDE_IMAGES = config["include_images"]
+OUTPUT_PATH = config["output_path"]
+USER_AGENT = config["user_agent"]
+HTML_PARSER = config["html_parser"]
+LISTING_CLASS = config["listing_class"]
+BOLIG_TYPES = config["bolig_types"]
+MAX_PAGES = config["max_pages"]
 
 SESSION = requests.Session()
 HEADERS = {'User-Agent': USER_AGENT}
-
 
 def _extract_bolig_data(bolig_url: str) -> tuple:
     source = SESSION.get(bolig_url, headers=HEADERS).text

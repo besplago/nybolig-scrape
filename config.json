@@ -1,0 +1,21 @@
+{
+    "output_path": "./output",
+    "pages": 1,
+    "include_images": true,
+    "bolig_types": {
+      "villa": true,
+      "rækkehus": true,
+      "ejerlejlighed": true,
+      "fritidsbolig": true,
+      "andelsbolig": true,
+      "villalejlighed": true,
+      "landejendom": false,
+      "helårsgrund": false,
+      "fritidsgrund": false
+    },
+    "url": "https://www.nybolig.dk",
+    "max_pages": 2404,
+    "html_parser": "lxml",
+    "listing_class": "list__item",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3 Edge/16.16299"
+  }
