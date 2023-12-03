@@ -4,6 +4,7 @@ import json
 import os
 
 # Settings
+OUTPUT_PATH = './output'
 PAGES = 1 # Amount of pages to scrape
 INCLUDE_IMAGES = True # Is very slow if set to True
 BOLIG_TYPES = { # Which bolig types to include
@@ -19,7 +20,6 @@ BOLIG_TYPES = { # Which bolig types to include
 }
 
 # Constants
-OUTPUT_PATH = './output'
 URL = 'https://www.nybolig.dk'
 MAX_PAGES = 2404
 HTML_PARSER = 'lxml'
