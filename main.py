@@ -1,7 +1,9 @@
 from bs4 import BeautifulSoup
 import requests
+import json
+import os
 
-OUTPUT_PATH = '.'
+OUTPUT_PATH = './output'
 URL = 'https://www.nybolig.dk'
 PAGES = 1
 MAX_PAGES = 2404
@@ -21,7 +23,7 @@ BOLIG_TYPES = {
 HTML_PARSER = 'lxml'
 LISTING_CLASS = 'list__item'
 
-def _extract_bolig_data(bolig_url: str) -> None:
+def _extract_bolig_data(bolig_url: str) -> dict:
     source: str = requests.get(bolig_url, headers={'User-Agent': 'Mozilla/5.0'}).text
     soup: BeautifulSoup = BeautifulSoup(source, HTML_PARSER)
     bolig_data: dict = {}
@@ -32,6 +34,8 @@ def _extract_bolig_data(bolig_url: str) -> None:
     bolig_data['rooms'] = _extract_rooms(soup)
     bolig_data['year_built'] = _extract_year_built(soup)
     bolig_data['year_renovated'] = _extract_year_renovated(soup)
+
+    return bolig_data
 
 def _start_scraping(pages: int) -> None:
     pages: int = _get_pages(pages)
@@ -51,8 +55,16 @@ def _start_scraping(pages: int) -> None:
             print(f"Extracting data from {address_paragraph.text}")
             a_tag = bolig.find('a', class_='tile__image-container')
             bolig_url: str = URL + a_tag['href']
+            # Create new folder for bolig
+            bolig_folder: str = f"{OUTPUT_PATH}/{address_paragraph.text}"
+            if not os.path.exists(bolig_folder):
+                os.mkdir(bolig_folder)
+            # Extract the data from the bolig
             try:
-                _extract_bolig_data(bolig_url)
+                bolig_data: dict = _extract_bolig_data(bolig_url)
+                # Save the data to a json file
+                with open(f"{bolig_folder}/data.json", 'w') as f:
+                    json.dump(bolig_data, f, indent=4)
             except Exception as e:
                 print(f"Error extracting data from {bolig_url}: {e}")
         page += 1
@@ -124,7 +136,12 @@ def _get_pages(pages: int) -> int:
         pages = MAX_PAGES
     return pages
 
+def _check_output_path() -> None:
+    if not os.path.exists(OUTPUT_PATH):
+        os.mkdir(OUTPUT_PATH)
+
 def main():
+    _check_output_path()
     _start_scraping(PAGES)
 
 if __name__ == '__main__':
