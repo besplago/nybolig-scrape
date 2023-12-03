@@ -1,4 +1,4 @@
-# Nybolig Scrape Project
+# Nybolig Bolig Scraper
 ## Overview
 This project is designed to scrape data, floor plans, and images from the Nybolig website (https://www.nybolig.dk/). The scraper is implemented in Python and utilizes the BeautifulSoup library for parsing HTML.
 
