@@ -2,12 +2,13 @@ from bs4 import BeautifulSoup
 import requests
 import json
 import os
+from pathlib import Path
 
 # Settings
 OUTPUT_PATH = './output'
-PAGES = 1 # Amount of pages to scrape
-INCLUDE_IMAGES = True # Is very slow if set to True
-BOLIG_TYPES = { # Which bolig types to include
+PAGES = 1  # Amount of pages to scrape
+INCLUDE_IMAGES = True  # Is very slow if set to True
+BOLIG_TYPES = {  # Which bolig types to include
     'villa': True,
     'rækkehus': True,
     'ejerlejlighed': True,
@@ -24,13 +25,19 @@ URL = 'https://www.nybolig.dk'
 MAX_PAGES = 2404
 HTML_PARSER = 'lxml'
 LISTING_CLASS = 'list__item'
-USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3 Edge/16.16299'
+USER_AGENT = (
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3 Edge/16.16299'
+)
+
+SESSION = requests.Session()
+HEADERS = {'User-Agent': USER_AGENT}
+
 
 def _extract_bolig_data(bolig_url: str) -> tuple:
-    source = requests.get(bolig_url, headers={'User-Agent': USER_AGENT}).text
-    soup: BeautifulSoup = BeautifulSoup(source, HTML_PARSER)
-    bolig_data: dict = {}
-    image_urls: list = []
+    source = SESSION.get(bolig_url, headers=HEADERS).text
+    soup = BeautifulSoup(source, HTML_PARSER)
+    bolig_data = {}
+    image_urls = []
 
     # Extract the data from the bolig
     bolig_data['url'] = bolig_url
@@ -42,9 +49,9 @@ def _extract_bolig_data(bolig_url: str) -> tuple:
     bolig_data['year_renovated'] = _extract_year_renovated(soup)
 
     # Extract floor plan from the bolig
-    floor_plan_container: BeautifulSoup = soup.find('div', class_='floorplan__drawing-container')
+    floor_plan_container = soup.find('div', class_='floorplan__drawing-container')
     if floor_plan_container:
-        floor_plan_url: str = floor_plan_container.find('img', class_='floorplan__drawing lazy').get('data-src', '')
+        floor_plan_url = floor_plan_container.find('img', class_='floorplan__drawing lazy').get('data-src', '')
         image_urls.append(floor_plan_url)
 
     # Extract the images from the bolig
@@ -55,83 +62,103 @@ def _extract_bolig_data(bolig_url: str) -> tuple:
                 image_url = img_tag.get('data-src', '')
                 image_urls.append(image_url)
 
-    return (bolig_data, image_urls)
+    return bolig_data, image_urls
+
+
+def _create_bolig_folder(address: str) -> None:
+    bolig_folder = Path(OUTPUT_PATH) / address
+    bolig_folder.mkdir(parents=True, exist_ok=True)
+
+
+def _save_data_and_images(bolig_folder: Path, bolig_data: dict, images: list) -> None:
+    with open(bolig_folder / 'data.json', 'w') as f:
+        json.dump(bolig_data, f, indent=4)
+
+    for i, image_url in enumerate(images):
+        image_data = SESSION.get(image_url).content
+        with open(bolig_folder / f'{i}.jpg', 'wb') as f:
+            f.write(image_data)
+
+
+def _process_bolig(bolig: BeautifulSoup) -> None:
+    div_tile = bolig.find('div', class_='tile')
+    if not div_tile:
+        return
+
+    valid_bolig_type = _check_bolig_type(bolig)
+    if not valid_bolig_type:
+        return
+
+    address_paragraph = div_tile.find('p', class_='tile__address')
+    print(f"Extracting data from {address_paragraph.text}")
+
+    a_tag = bolig.find('a', class_='tile__image-container')
+    bolig_url = URL + a_tag['href']
+
+    bolig_folder = Path(OUTPUT_PATH) / address_paragraph.text
+    _create_bolig_folder(bolig_folder)
+
+    try:
+        bolig_data, images = _extract_bolig_data(bolig_url)
+        _save_data_and_images(bolig_folder, bolig_data, images)
+    except requests.exceptions.RequestException as e:
+        print(f"Error extracting data from {bolig_url}: {e}")
+
 
 def _start_scraping(pages: int) -> None:
-    pages: int = _get_pages(pages)
-    page: int = 1
-    while page <= pages:
-        sale_url: str = f"{URL}/til-salg?page={page}"
-        source: str = requests.get(sale_url, headers={'User-Agent': 'Mozilla/5.0'}).text
-        soup: BeautifulSoup = BeautifulSoup(source, HTML_PARSER)
+    total_pages = _get_pages(pages)
+    for page in range(1, total_pages + 1):
+        sale_url = f"{URL}/til-salg?page={page}"
+        soup = _get_soup(sale_url)
         for bolig in soup.find_all('li', class_=LISTING_CLASS):
-            div_tile: BeautifulSoup = bolig.find('div', class_='tile')
-            if not div_tile:
-                continue
-            valid_bolig_type: bool = _check_bolig_type(bolig)
-            if not valid_bolig_type:
-                continue
-            address_paragraph: BeautifulSoup = div_tile.find('p', class_='tile__address')
-            print(f"Extracting data from {address_paragraph.text}")
+            _process_bolig(bolig)
+    print(f"Finished scraping {total_pages} pages")
 
-            a_tag = bolig.find('a', class_='tile__image-container')
-            bolig_url: str = URL + a_tag['href']
 
-            # Create new folder for bolig
-            bolig_folder: str = f"{OUTPUT_PATH}/{address_paragraph.text}"
-            if not os.path.exists(bolig_folder):
-                os.mkdir(bolig_folder)
+def _get_soup(url: str) -> BeautifulSoup:
+    response = SESSION.get(url, headers=HEADERS)
+    response.raise_for_status()  # Check if the request was successful
+    return BeautifulSoup(response.text, HTML_PARSER)
 
-            # Extract the data from the bolig
-            try:
-                bolig_data, images = _extract_bolig_data(bolig_url)
-                # Save the data to a json file
-                with open(f"{bolig_folder}/data.json", 'w') as f:
-                    json.dump(bolig_data, f, indent=4)
-
-                # Save the images to the folder
-                for i, image_url in enumerate(images):
-                    image_data = requests.get(image_url).content
-                    with open(f"{bolig_folder}/{i}.jpg", 'wb') as f:
-                        f.write(image_data)
-            except Exception as e:
-                print(f"Error extracting data from {bolig_url}: {e}")
-        page += 1
-    print(f"Finished scraping {pages} pages")
 
 def _extract_year_renovated(soup: BeautifulSoup) -> int:
     for fact in soup.find_all('div', class_='case-facts__box-inner-wrap'):
         if 'Bygget/Ombygget' in fact.text:
-            year_renovated_raw: str = fact.find('strong').text.split('/')
+            year_renovated_raw = fact.find('strong').text.split('/')
             if len(year_renovated_raw) > 1:
-                year_renovated: int = int(year_renovated_raw[1])
+                year_renovated = int(year_renovated_raw[1])
                 return year_renovated
             else:
                 return None
 
+
 def _extract_year_built(soup: BeautifulSoup) -> int:
     for fact in soup.find_all('div', class_='case-facts__box-inner-wrap'):
         if 'Bygget/Ombygget' in fact.text:
-            year_built: int = int(fact.find('strong').text.split('/')[0])
+            year_built = int(fact.find('strong').text.split('/')[0])
             return year_built
+
 
 def _extract_rooms(soup: BeautifulSoup) -> int:
     for fact in soup.find_all('div', class_='case-facts__box-inner-wrap'):
         if 'Stue/Værelser' in fact.text:
-            living_rooms: int = int(fact.find('strong').text.split('/')[0])
-            rooms: int = int(fact.find('strong').text.split('/')[1])
+            living_rooms = int(fact.find('strong').text.split('/')[0])
+            rooms = int(fact.find('strong').text.split('/')[1])
             return living_rooms + rooms
+
 
 def _extract_size(soup: BeautifulSoup) -> int:
     for fact in soup.find_all('div', class_='case-facts__box-inner-wrap'):
         if 'Boligareal' in fact.text:
             return int(fact.find('strong').text.split(' ')[0])
 
+
 def _extract_price(soup: BeautifulSoup) -> int:
-    price_raw: str = soup.find('span', class_='case-info__property__info__text__price').text.strip()
+    price_raw = soup.find('span', class_='case-info__property__info__text__price').text.strip()
     # remove non-numeric characters
-    price: int = int(''.join(filter(str.isdigit, price_raw)))
+    price = int(''.join(filter(str.isdigit, price_raw)))
     return price
+
 
 def _extract_address(soup: BeautifulSoup) -> str:
     # Extract the address components and join them with a space
@@ -143,21 +170,23 @@ def _extract_address(soup: BeautifulSoup) -> str:
     address_components = [component for component in address_components if component]
 
     # Join the non-empty components with a space
-    address: str = ' '.join(address_components)
+    address = ' '.join(address_components)
 
     # Remove newline characters from the address
     address = address.replace('\n', '')
 
     return address
 
+
 def _check_bolig_type(bolig: BeautifulSoup) -> bool:
-    bolig_type_raw: str = bolig.find('p', class_='tile__mix').text.strip().lower()
-    bolig_type: str = bolig_type_raw.split(' ')[0]
+    bolig_type_raw = bolig.find('p', class_='tile__mix').text.strip().lower()
+    bolig_type = bolig_type_raw.split(' ')[0]
     if bolig_type in BOLIG_TYPES:
         return BOLIG_TYPES[bolig_type]
     else:
         print(f"Unknown bolig type: {bolig_type}")
         return False
+
 
 def _get_pages(pages: int) -> int:
     if pages > MAX_PAGES:
@@ -165,13 +194,16 @@ def _get_pages(pages: int) -> int:
         pages = MAX_PAGES
     return pages
 
+
 def _check_output_path() -> None:
     if not os.path.exists(OUTPUT_PATH):
         os.mkdir(OUTPUT_PATH)
 
+
 def main():
     _check_output_path()
     _start_scraping(PAGES)
+
 
 if __name__ == '__main__':
     main()
