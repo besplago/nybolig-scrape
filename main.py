@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
 import requests
 import json
@@ -97,12 +98,21 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
 
 
 def _start_scraping(pages: int) -> None:
-    total_pages = _get_pages(pages)
-    for page in range(1, total_pages + 1):
-        sale_url = f"{URL}/til-salg?page={page}"
-        soup = _get_soup(sale_url)
-        for bolig in soup.find_all('li', class_=LISTING_CLASS):
-            _process_bolig(bolig)
+    total_pages: int = _get_pages(pages)
+
+    with ThreadPoolExecutor() as executor:
+        futures: list = []
+
+        for page in range(1, total_pages + 1):
+            sale_url: str = f"{URL}/til-salg?page={page}"
+            soup: BeautifulSoup = _get_soup(sale_url)
+            for bolig in soup.find_all('li', class_=LISTING_CLASS):
+                futures.append(executor.submit(_process_bolig, bolig))
+
+        # Wait for all threads to finish
+        for future in futures:
+            future.result()
+
     print(f"Finished scraping {total_pages} pages")
 
 
