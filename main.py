@@ -1,9 +1,8 @@
-from concurrent.futures import ThreadPoolExecutor
-from bs4 import BeautifulSoup
-import requests
 import json
-import os
+import requests
+from bs4 import BeautifulSoup
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 # Load configuration from file
 config_file_path = Path("config.json")
@@ -16,6 +15,7 @@ with open(config_file_path, "r", encoding="utf-8") as config_file:
 URL = config["url"]
 PAGES = config["pages"]
 INCLUDE_IMAGES = config["include_images"]
+OVERRIDE_PREVIOUS_DATA = config["override_previous_data"]
 OUTPUT_PATH = config["output_path"]
 USER_AGENT = config["user_agent"]
 HTML_PARSER = config["html_parser"]
@@ -59,7 +59,10 @@ def _extract_bolig_data(bolig_url: str) -> tuple:
 
 
 def _create_bolig_folder(bolig_folder: Path) -> None:
-    bolig_folder.mkdir(parents=True, exist_ok=True)
+    if OVERRIDE_PREVIOUS_DATA or not bolig_folder.exists():
+        bolig_folder.mkdir(parents=True, exist_ok=True)
+    else:
+        print(f"Skipping existing folder: {bolig_folder}")
 
 
 def _save_data_and_images(bolig_folder: Path, bolig_data: dict, images: list) -> None:
@@ -90,11 +93,14 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
     bolig_folder = Path(OUTPUT_PATH).joinpath(address_paragraph.text)
     _create_bolig_folder(bolig_folder)
 
-    try:
-        bolig_data, images = _extract_bolig_data(bolig_url)
-        _save_data_and_images(bolig_folder, bolig_data, images)
-    except requests.exceptions.RequestException as e:
-        print(f"Error extracting data from {bolig_url}: {e}")
+    if OVERRIDE_PREVIOUS_DATA or not bolig_folder.exists():
+        try:
+            bolig_data, images = _extract_bolig_data(bolig_url)
+            _save_data_and_images(bolig_folder, bolig_data, images)
+        except requests.exceptions.RequestException as e:
+            print(f"Error extracting data from {bolig_url}: {e}")
+    else:
+        print(f"Skipping existing data in folder: {bolig_folder}")
 
 
 def _start_scraping(pages: int) -> None:
