@@ -1,36 +1,37 @@
+'''A script for scraping housing data from nybolig.dk'''
 import json
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
-from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
 
 # Load configuration from file
-config_file_path = Path("config.json")
+config_file_path: Path = Path(__file__).parent.joinpath("config.json")
 if not config_file_path.is_file():
     raise FileNotFoundError("Configuration file not found.")
 
 with open(config_file_path, "r", encoding="utf-8") as config_file:
-    config = json.load(config_file)
+    config: dict = json.load(config_file)
 
-URL = config["url"]
-PAGES = config["pages"]
-INCLUDE_IMAGES = config["include_images"]
-OVERRIDE_PREVIOUS_DATA = config["override_previous_data"]
-OUTPUT_PATH = config["output_path"]
-USER_AGENT = config["user_agent"]
-HTML_PARSER = config["html_parser"]
-LISTING_CLASS = config["listing_class"]
-BOLIG_TYPES = config["bolig_types"]
-MAX_PAGES = config["max_pages"]
+URL: str = config["url"]
+PAGES: int = config["pages"]
+INCLUDE_IMAGES: bool = config["include_images"]
+OVERRIDE_PREVIOUS_DATA: bool = config["override_previous_data"]
+OUTPUT_PATH: str = config["output_path"]
+USER_AGENT: str = config["user_agent"]
+HTML_PARSER: str = config["html_parser"]
+LISTING_CLASS: str = config["listing_class"]
+BOLIG_TYPES: dict = config["bolig_types"]
+MAX_PAGES: int = config["max_pages"]
 
-SESSION = requests.Session()
-HEADERS = {'User-Agent': USER_AGENT}
+SESSION: requests.Session = requests.Session()
+HEADERS: dict = {'User-Agent': USER_AGENT}
 
 def _extract_bolig_data(bolig_url: str) -> tuple:
-    source = SESSION.get(bolig_url, headers=HEADERS).text
+    source: requests.Response = SESSION.get(bolig_url, headers=HEADERS).text
     soup = BeautifulSoup(source, HTML_PARSER)
-    bolig_data = {}
-    image_urls = []
+    bolig_data: dict = {}
+    image_urls: list = []
 
     # Extract the data from the bolig
     bolig_data['url'] = bolig_url
@@ -44,7 +45,9 @@ def _extract_bolig_data(bolig_url: str) -> tuple:
     # Extract floor plan from the bolig
     floor_plan_container = soup.find('div', class_='floorplan__drawing-container')
     if floor_plan_container:
-        floor_plan_url = floor_plan_container.find('img', class_='floorplan__drawing lazy').get('data-src', '')
+        floor_plan_url = floor_plan_container.find(
+            'img', class_='floorplan__drawing lazy').get('data-src', ''
+        )
         image_urls.append(floor_plan_url)
 
     # Extract the images from the bolig
@@ -135,8 +138,8 @@ def _extract_year_renovated(soup: BeautifulSoup) -> int:
             if len(year_renovated_raw) > 1:
                 year_renovated = int(year_renovated_raw[1])
                 return year_renovated
-            else:
-                return None
+            return None
+        return None
 
 
 def _extract_year_built(soup: BeautifulSoup) -> int:
@@ -144,6 +147,7 @@ def _extract_year_built(soup: BeautifulSoup) -> int:
         if 'Bygget/Ombygget' in fact.text:
             year_built = int(fact.find('strong').text.split('/')[0])
             return year_built
+        return None
 
 
 def _extract_rooms(soup: BeautifulSoup) -> int:
@@ -152,12 +156,14 @@ def _extract_rooms(soup: BeautifulSoup) -> int:
             living_rooms = int(fact.find('strong').text.split('/')[0])
             rooms = int(fact.find('strong').text.split('/')[1])
             return living_rooms + rooms
+        return None
 
 
 def _extract_size(soup: BeautifulSoup) -> int:
     for fact in soup.find_all('div', class_='case-facts__box-inner-wrap'):
         if 'Boligareal' in fact.text:
             return int(fact.find('strong').text.split(' ')[0])
+        return None
 
 
 def _extract_price(soup: BeautifulSoup) -> int:
@@ -170,7 +176,9 @@ def _extract_price(soup: BeautifulSoup) -> int:
 def _extract_address(soup: BeautifulSoup) -> str:
     # Extract the address components and join them with a space
     address_components = [
-        component.text.strip() for component in soup.find_all('strong', class_='case-info__property__info__main__title__address')
+        component.text.strip() for component in soup.find_all(
+            'strong', class_='case-info__property__info__main__title__address'
+        )
     ]
 
     # Filter out empty components
@@ -188,12 +196,13 @@ def _extract_address(soup: BeautifulSoup) -> str:
 def _check_bolig_type(bolig: BeautifulSoup) -> bool:
     bolig_type_raw = bolig.find('p', class_='tile__mix').text.strip().lower()
     bolig_type = bolig_type_raw.split(' ')[0]
+
     if bolig_type in BOLIG_TYPES:
         return BOLIG_TYPES[bolig_type]
-    else:
-        print(BOLIG_TYPES)
-        print(f"Unknown bolig type: {bolig_type}")
-        return False
+
+    print(BOLIG_TYPES)
+    print(f"Unknown bolig type: {bolig_type}")
+    return False
 
 
 def _get_pages(pages: int) -> int:
@@ -204,6 +213,7 @@ def _get_pages(pages: int) -> int:
 
 
 def main():
+    '''Main function'''
     _start_scraping(PAGES)
 
 
