@@ -1,2 +1,5 @@
 venv/
 output/
+
+# VSC
+.vscode/

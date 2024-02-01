@@ -41,6 +41,7 @@ def _extract_bolig_data(bolig_url: str) -> tuple:
     bolig_data['rooms'] = _extract_rooms(soup)
     bolig_data['year_built'] = _extract_year_built(soup)
     bolig_data['year_renovated'] = _extract_year_renovated(soup)
+    bolig_data['energy_label'] = _extract_energy_label(soup)
 
     # Extract floor plan from the bolig
     floor_plan_container = soup.find('div', class_='floorplan__drawing-container')
@@ -139,15 +140,17 @@ def _extract_year_renovated(soup: BeautifulSoup) -> int:
                 year_renovated = int(year_renovated_raw[1])
                 return year_renovated
             return None
-        return None
+    return None
 
 
 def _extract_year_built(soup: BeautifulSoup) -> int:
     for fact in soup.find_all('div', class_='case-facts__box-inner-wrap'):
         if 'Bygget/Ombygget' in fact.text:
-            year_built = int(fact.find('strong').text.split('/')[0])
+            built_rebuilt_raw = fact.find('strong').text.split('/')
+            year_built: int = int(built_rebuilt_raw[0])
             return year_built
-        return None
+    return None
+
 
 
 def _extract_rooms(soup: BeautifulSoup) -> int:
@@ -156,14 +159,14 @@ def _extract_rooms(soup: BeautifulSoup) -> int:
             living_rooms = int(fact.find('strong').text.split('/')[0])
             rooms = int(fact.find('strong').text.split('/')[1])
             return living_rooms + rooms
-        return None
+    return None
 
 
 def _extract_size(soup: BeautifulSoup) -> int:
     for fact in soup.find_all('div', class_='case-facts__box-inner-wrap'):
         if 'Boligareal' in fact.text:
             return int(fact.find('strong').text.split(' ')[0])
-        return None
+    return None
 
 
 def _extract_price(soup: BeautifulSoup) -> int:
@@ -193,6 +196,12 @@ def _extract_address(soup: BeautifulSoup) -> str:
     return address
 
 
+def _extract_energy_label(soup: BeautifulSoup) -> str:
+    for fact in soup.find_all('div', class_='case-facts__box-inner-wrap'):
+        if 'Energimærke' in fact.text:
+            return fact.find('strong').text.strip()
+    return None
+
 def _check_bolig_type(bolig: BeautifulSoup) -> bool:
     bolig_type_raw = bolig.find('p', class_='tile__mix').text.strip().lower()
     bolig_type = bolig_type_raw.split(' ')[0]
@@ -200,8 +209,6 @@ def _check_bolig_type(bolig: BeautifulSoup) -> bool:
     if bolig_type in BOLIG_TYPES:
         return BOLIG_TYPES[bolig_type]
 
-    print(BOLIG_TYPES)
-    print(f"Unknown bolig type: {bolig_type}")
     return False
 
 
