@@ -37,11 +37,7 @@ def _extract_bolig_data(bolig_url: str) -> tuple:
     bolig_data['url'] = bolig_url
     bolig_data['address'] = _extract_address(soup)
     bolig_data['price'] = _extract_price(soup)
-    bolig_data['size'] = _extract_size(soup)
-    bolig_data['rooms'] = _extract_rooms(soup)
-    bolig_data['year_built'] = _extract_year_built(soup)
-    bolig_data['year_renovated'] = _extract_year_renovated(soup)
-    bolig_data['energy_label'] = _extract_energy_label(soup)
+    bolig_data.update(_extract_bolig_facts_box(soup))
 
     # Extract floor plan from the bolig
     floor_plan_container = soup.find('div', class_='floorplan__drawing-container')
@@ -132,41 +128,24 @@ def _get_soup(url: str) -> BeautifulSoup:
     return BeautifulSoup(response.text, HTML_PARSER)
 
 
-def _extract_year_renovated(soup: BeautifulSoup) -> int:
-    for fact in soup.find_all('div', class_='case-facts__box-inner-wrap'):
-        if 'Bygget/Ombygget' in fact.text:
-            year_renovated_raw = fact.find('strong').text.split('/')
-            if len(year_renovated_raw) > 1:
-                year_renovated = int(year_renovated_raw[1])
-                return year_renovated
-            return None
-    return None
-
-
-def _extract_year_built(soup: BeautifulSoup) -> int:
-    for fact in soup.find_all('div', class_='case-facts__box-inner-wrap'):
-        if 'Bygget/Ombygget' in fact.text:
-            built_rebuilt_raw = fact.find('strong').text.split('/')
-            year_built: int = int(built_rebuilt_raw[0])
-            return year_built
-    return None
-
-
-
-def _extract_rooms(soup: BeautifulSoup) -> int:
-    for fact in soup.find_all('div', class_='case-facts__box-inner-wrap'):
-        if 'Stue/Værelser' in fact.text:
-            living_rooms = int(fact.find('strong').text.split('/')[0])
-            rooms = int(fact.find('strong').text.split('/')[1])
-            return living_rooms + rooms
-    return None
-
-
-def _extract_size(soup: BeautifulSoup) -> int:
+def _extract_bolig_facts_box(soup: BeautifulSoup) -> dict:
+    bolig_data: dict = {}
     for fact in soup.find_all('div', class_='case-facts__box-inner-wrap'):
         if 'Boligareal' in fact.text:
-            return int(fact.find('strong').text.split(' ')[0])
-    return None
+            bolig_data['size'] = int(fact.find('strong').text.split(' ')[0])
+        elif 'Stue/Værelser' in fact.text:
+            living_rooms = int(fact.find('strong').text.split('/')[0])
+            rooms = int(fact.find('strong').text.split('/')[1])
+            bolig_data['rooms'] = living_rooms + rooms
+        elif 'Bygget/Ombygget' in fact.text:
+            built_rebuilt_raw = fact.find('strong').text.split('/')
+            bolig_data['year_built'] = int(built_rebuilt_raw[0])
+            if len(built_rebuilt_raw) > 1:
+                bolig_data['year_renovated'] = int(built_rebuilt_raw[1])
+        elif 'Energimærke' in fact.text:
+            bolig_data['energy_label'] = fact.contents[3].get('class')[1].split('-')[2]
+
+    return bolig_data
 
 
 def _extract_price(soup: BeautifulSoup) -> int:
@@ -195,12 +174,6 @@ def _extract_address(soup: BeautifulSoup) -> str:
 
     return address
 
-
-def _extract_energy_label(soup: BeautifulSoup) -> str:
-    for fact in soup.find_all('div', class_='case-facts__box-inner-wrap'):
-        if 'Energimærke' in fact.text:
-            return fact.find('strong').text.strip()
-    return None
 
 def _check_bolig_type(bolig: BeautifulSoup) -> bool:
     bolig_type_raw = bolig.find('p', class_='tile__mix').text.strip().lower()
