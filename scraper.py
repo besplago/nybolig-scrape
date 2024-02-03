@@ -84,16 +84,17 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
     if not valid_bolig_type:
         return
 
-    address_paragraph = div_tile.find('p', class_='tile__address')
-    print(f"Extracting data from {address_paragraph.text}")
+    address_paragraph_raw = div_tile.find('p', class_='tile__address')
+    address_paragraph: str = address_paragraph_raw.text.replace(',', '')
+    print(f"Extracting data from {address_paragraph}")
 
     a_tag = bolig.find('a', class_='tile__image-container')
     bolig_url = URL + a_tag['href']
 
-    bolig_folder = Path(OUTPUT_PATH).joinpath(address_paragraph.text)
+    bolig_folder = Path(OUTPUT_PATH).joinpath(address_paragraph)
     _create_bolig_folder(bolig_folder)
 
-    if OVERRIDE_PREVIOUS_DATA or not bolig_folder.exists():
+    if OVERRIDE_PREVIOUS_DATA or not (bolig_folder / 'data.json').exists():
         try:
             bolig_data, images = _extract_bolig_data(bolig_url)
             _save_data_and_images(bolig_folder, bolig_data, images)
@@ -133,7 +134,13 @@ def _get_soup(url: str) -> BeautifulSoup:
 
 
 def _extract_bolig_facts_box(soup: BeautifulSoup) -> dict:
-    bolig_data: dict = {}
+    bolig_data: dict = {
+        'size': None,
+        'rooms': None,
+        'year_built': None,
+        'year_renovated': None,
+        'energy_label': None
+    }
     for fact in soup.find_all('div', class_='case-facts__box-inner-wrap'):
         if 'Boligareal' in fact.text:
             bolig_data['size'] = int(fact.find('strong').text.split(' ')[0])
@@ -175,6 +182,9 @@ def _extract_address(soup: BeautifulSoup) -> str:
 
     # Remove newline characters from the address
     address = address.replace('\n', '')
+
+    # Remove commas from the address
+    address = address.replace(',', '')
 
     return address
 

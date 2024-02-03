@@ -14,6 +14,7 @@ def convert() -> None:
 
     # Convert the jsons to a csv, based on the jsons keys
     csv = []
+    csv.append(",".join(jsons[0].keys()))
     for json_data in jsons:
         csv.append(",".join(str(value) for value in json_data.values()))
 

@@ -1,4 +1,4 @@
-"""main.py"""
+"""Main module for the scraping and converting tool."""
 import argparse
 import scraper
 import converter
@@ -15,11 +15,17 @@ def main():
 
     args = parser.parse_args()
 
-    if args.scrape:
+    # Check if neither -s nor -c options are provided, then call both functions
+    if not args.scrape and not args.convert:
         scraper.scrape()
-
-    if args.convert:
         converter.convert()
+    else:
+        # Otherwise, execute the corresponding functions based on the provided arguments
+        if args.scrape:
+            scraper.scrape()
+
+        if args.convert:
+            converter.convert()
 
 if __name__ == '__main__':
     main()
