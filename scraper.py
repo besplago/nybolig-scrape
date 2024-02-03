@@ -27,7 +27,7 @@ MAX_PAGES: int = config["max_pages"]
 SESSION: requests.Session = requests.Session()
 HEADERS: dict = {'User-Agent': USER_AGENT}
 
-def _extract_bolig_data(bolig_url: str) -> tuple:
+def _extract_bolig_data(bolig_url: str, bolig_type: str) -> tuple:
     source: requests.Response = SESSION.get(bolig_url, headers=HEADERS).text
     soup = BeautifulSoup(source, HTML_PARSER)
     bolig_data: dict = {}
@@ -37,7 +37,7 @@ def _extract_bolig_data(bolig_url: str) -> tuple:
     bolig_data['url'] = bolig_url
     bolig_data['address'] = _extract_address(soup)
     bolig_data['postal_code'] = _extract_postal_code(bolig_url)
-    bolig_data['type'] = _extract_bolig_type(soup)
+    bolig_data['type'] = bolig_type
     bolig_data['price'] = _extract_price(soup)
     bolig_data.update(_extract_bolig_facts_box(soup))
 
@@ -98,7 +98,7 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
 
     if OVERRIDE_PREVIOUS_DATA or not (bolig_folder / 'data.json').exists():
         try:
-            bolig_data, images = _extract_bolig_data(bolig_url)
+            bolig_data, images = _extract_bolig_data(bolig_url, bolig_type)
             _save_data_and_images(bolig_folder, bolig_data, images)
         except requests.exceptions.RequestException as e:
             print(f"Error extracting data from {bolig_url}: {e}")
@@ -176,6 +176,7 @@ def _extract_postal_code(url: str) -> int:
     # Extract the postal code from the url
     postal_code: int = int(url.split('/')[4])
     return postal_code
+
 
 def _extract_address(soup: BeautifulSoup) -> str:
     # Extract the address components and join them with a space

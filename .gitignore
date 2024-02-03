@@ -1,6 +1,6 @@
 venv/
 output/
-output.csv
+bolig_data.csv
 
 # VSC
 .vscode/
