@@ -105,6 +105,7 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
 
 def _start_scraping(pages: int) -> None:
     total_pages: int = _get_pages(pages)
+    total_boliger: int = 0
 
     with ThreadPoolExecutor() as executor:
         futures: list = []
@@ -113,6 +114,7 @@ def _start_scraping(pages: int) -> None:
             sale_url: str = f"{URL}/til-salg?page={page}"
             soup: BeautifulSoup = _get_soup(sale_url)
             for bolig in soup.find_all('li', class_=LISTING_CLASS):
+                total_boliger += 1
                 futures.append(executor.submit(_process_bolig, bolig))
 
         # Wait for all threads to finish
@@ -120,6 +122,7 @@ def _start_scraping(pages: int) -> None:
             future.result()
 
     print(f"Finished scraping {total_pages} pages")
+    print(f"Extracted data from {total_boliger} boliger")
 
 
 def _get_soup(url: str) -> BeautifulSoup:
