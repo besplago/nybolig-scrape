@@ -36,7 +36,7 @@ def _extract_bolig_data(bolig_url: str) -> tuple:
     # Extract the data from the bolig
     bolig_data['url'] = bolig_url
     bolig_data['address'] = _extract_address(soup)
-    bolig_data['postal_code'] = _extract_postal_code(soup)
+    bolig_data['postal_code'] = _extract_postal_code(bolig_url)
     bolig_data['type'] = _extract_bolig_type(soup)
     bolig_data['price'] = _extract_price(soup)
     bolig_data.update(_extract_bolig_facts_box(soup))
@@ -83,7 +83,7 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
         return
 
     bolig_type = _extract_bolig_type(bolig)
-    if bolig_type not in BOLIG_TYPES:
+    if BOLIG_TYPES[bolig_type] is False:
         return
 
     address_paragraph_raw = div_tile.find('p', class_='tile__address')
@@ -172,22 +172,9 @@ def _extract_price(soup: BeautifulSoup) -> int:
     return price
 
 
-def _extract_postal_code(soup: BeautifulSoup) -> int:
-    address_components: list = [
-        component.text.strip() for component in soup.find_all(
-            'strong', class_='case-info__property__info__main__title__address'
-        )
-    ]
-
-    # Filter out empty components
-    address_components = [component for component in address_components if component]
-
-    # The municipality is the last component in the address
-    municipality_raw: str = address_components[-1]
-
-    # Extract the postal code from the municipality
-    postal_code: int = int(municipality_raw.split(' ')[0])
-
+def _extract_postal_code(url: str) -> int:
+    # Extract the postal code from the url
+    postal_code: int = int(url.split('/')[4])
     return postal_code
 
 def _extract_address(soup: BeautifulSoup) -> str:
