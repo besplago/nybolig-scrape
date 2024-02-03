@@ -103,7 +103,7 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
         print(f"Skipping existing data in folder: {bolig_folder}")
 
 
-def start_scraping() -> None:
+def scrape() -> None:
     """Start scraping housing data from nybolig.dk"""
     total_pages: int = _get_pages(PAGES)
     total_boliger: int = 0
