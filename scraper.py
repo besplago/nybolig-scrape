@@ -141,7 +141,7 @@ def _extract_bolig_facts_box(soup: BeautifulSoup) -> dict:
         'basement_size': None,
         'rooms': None,
         'year_built': None,
-        'year_renovated': None,
+        'year_rebuilt': None,
         'energy_label': None
     }
 
@@ -158,7 +158,7 @@ def _extract_bolig_facts_box(soup: BeautifulSoup) -> dict:
             built_rebuilt_raw = fact.find('strong').text.split('/')
             bolig_data['year_built'] = int(built_rebuilt_raw[0])
             if len(built_rebuilt_raw) > 1:
-                bolig_data['year_renovated'] = int(built_rebuilt_raw[1])
+                bolig_data['year_rebuilt'] = int(built_rebuilt_raw[1])
         elif 'Energimærke' in fact.text:
             bolig_data['energy_label'] = fact.contents[3].get('class')[1].split('-')[2]
 
