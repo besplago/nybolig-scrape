@@ -4,3 +4,9 @@ nybolig_data.csv
 
 # VSC
 .vscode/
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
