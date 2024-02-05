@@ -1,6 +1,6 @@
 venv/
 output/
-bolig_data.csv
+nybolig_data.csv
 
 # VSC
 .vscode/
