@@ -19,7 +19,7 @@ def convert() -> None:
         csv.append(",".join(str(value) for value in json_data.values()))
 
     # Write the csv to a file
-    with open("bolig_data.csv", "w", encoding="utf-8") as csv_file:
+    with open("nybolig_data.csv", "w", encoding="utf-8") as csv_file:
         csv_file.write("\n".join(csv))
 
     print("Conversion complete.")
