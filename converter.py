@@ -10,7 +10,8 @@ def convert() -> None:
         with open(json_file, "r", encoding="utf-8") as file:
             jsons.append(json.load(file))
 
-    print(f"Found {len(jsons)} json files.")
+    print("Converting jsons to csv...")
+    print(f"Found {len(jsons)} boliger (json files).")
 
     # Convert the jsons to a csv, based on the jsons keys
     csv = []
