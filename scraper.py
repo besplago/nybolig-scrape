@@ -104,13 +104,20 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
     a_tag = bolig.find('a', class_='tile__image-container')
     bolig_url = URL + a_tag['href']
 
-    # Check if apprpriate postal code
+    # Check if appropriate postal code
     postal_code: int = _extract_postal_code(bolig_url)
     in_range: bool = False
+    in_individual: bool = False
+    for postal_range in POSTAL_CODE_FILTERS['ranges']:
+        if postal_range[0] <= postal_code <= postal_range[1]:
+            in_range = True
+    if postal_code in POSTAL_CODE_FILTERS['individual']:
+        in_individual = True
+    if not (in_range or in_individual):
+        return
 
     address_paragraph_raw = div_tile.find('p', class_='tile__address')
     address_paragraph: str = address_paragraph_raw.text.replace(',', '')
-    print(f"Extracting data from {address_paragraph}")
 
     bolig_folder = Path(OUTPUT_PATH).joinpath(address_paragraph)
     _create_bolig_folder(bolig_folder)
@@ -119,6 +126,7 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
         try:
             bolig_data, images = _extract_bolig_data(bolig_url, bolig_type)
             _save_data_and_images(bolig_folder, bolig_data, images)
+            print(f"{address_paragraph} extracted")
         except requests.exceptions.RequestException as e:
             print(f"Error extracting data from {bolig_url}: {e}")
     else:

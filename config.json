@@ -4,19 +4,19 @@
     "include_images": false,
     "override_previous_data": true,
     "bolig_types": {
-      "villa": true,
-      "rækkehus": true,
+      "villa": false,
+      "rækkehus": false,
       "ejerlejlighed": true,
-      "fritidsbolig": true,
-      "andelsbolig": true,
-      "villalejlighed": true,
+      "fritidsbolig": false,
+      "andelsbolig": false,
+      "villalejlighed": false,
       "landejendom": false,
       "helårsgrund": false,
       "fritidsgrund": false
     },
     "postal_code_filters": {
       "ranges": [[1000, 2900]],
-      "individual": [3100]
+      "individual": []
     },
     "url": "https://www.nybolig.dk",
     "max_pages": 2256,
