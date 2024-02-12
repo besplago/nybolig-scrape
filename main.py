@@ -2,6 +2,7 @@
 import argparse
 import scraper
 import converter
+import time
 
 def main():
     """Main function for the scraping and converting tool."""
@@ -15,6 +16,8 @@ def main():
 
     args = parser.parse_args()
 
+    start_time = time.time()
+
     # Check if neither -s nor -c options are provided, then call both functions
     try:
         if not args.scrape and not args.convert:
@@ -27,6 +30,10 @@ def main():
 
             if args.convert:
                 converter.convert()
+
+        end_time = time.time()
+        print(f"Time taken: {end_time - start_time} seconds")
+
     except ValueError as ve:
         print(f"Value error: {ve}")
 
