@@ -1,8 +1,8 @@
 """Main module for the scraping and converting tool."""
 import argparse
+import time
 import scraper
 import converter
-import time
 
 def main():
     """Main function for the scraping and converting tool."""
