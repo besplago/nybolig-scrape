@@ -11,6 +11,15 @@ This project is designed to scrape data, floor plans, and images from the Nyboli
 
 ## Configuration
 Adjust the settings in the `config.json` file to customize the scraper behavior. You can find the configuration file [here](./config.json).
+
+- **output_path**: Specifies the directory where scraped data will be stored.
+- **pages**: Defines the number of pages the scraper will traverse on the Nybolig website.
+- **include_images**: Determines whether to download property images besides the floorplan. Set to `true` to download images; otherwise, set to `false`.
+- **override_previous_data**: If set to `true`, it will overwrite any existing data in the output directory; otherwise, it will append new data.
+- **bolig_types**: Specifies the types of properties to include in the scraping process. Each property type can be toggled on or off.
+- **postal_code_filters**: Allows filtering properties based on postal codes. You can specify ranges of postal codes and individual postal codes to include in the scraping process.
+- **remaining stuff**: Probably don't touch :\)
+
 **Note**: if `"include_images = true"`, the scraper will download all images. This can take a long time and consume a lot of disk space.
 
 ## Usage

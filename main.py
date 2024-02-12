@@ -16,16 +16,19 @@ def main():
     args = parser.parse_args()
 
     # Check if neither -s nor -c options are provided, then call both functions
-    if not args.scrape and not args.convert:
-        scraper.scrape()
-        converter.convert()
-    else:
-        # Otherwise, execute the corresponding functions based on the provided arguments
-        if args.scrape:
+    try:
+        if not args.scrape and not args.convert:
             scraper.scrape()
-
-        if args.convert:
             converter.convert()
+        else:
+            # Otherwise, execute the corresponding functions based on the provided arguments
+            if args.scrape:
+                scraper.scrape()
+
+            if args.convert:
+                converter.convert()
+    except ValueError as ve:
+        print(f"Value error: {ve}")
 
 if __name__ == '__main__':
     main()

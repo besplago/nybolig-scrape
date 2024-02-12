@@ -23,9 +23,23 @@ HTML_PARSER: str = config["html_parser"]
 LISTING_CLASS: str = config["listing_class"]
 BOLIG_TYPES: dict = config["bolig_types"]
 MAX_PAGES: int = config["max_pages"]
+POSTAL_CODE_FILTERS: dict = config["postal_code_filters"]
 
 SESSION: requests.Session = requests.Session()
 HEADERS: dict = {'User-Agent': USER_AGENT}
+
+
+def _validate_config():
+    for postal_range in POSTAL_CODE_FILTERS['ranges']:
+        if len(postal_range) != 2:
+            raise ValueError(
+                "Postal code filter ranges must have exactly two numbers.", postal_range
+            )
+        if postal_range[0] > postal_range[1]:
+            raise ValueError(
+                "Invalid postal code range: start value is greater than end value.", postal_range
+            )
+
 
 def _extract_bolig_data(bolig_url: str, bolig_type: str) -> tuple:
     source: requests.Response = SESSION.get(bolig_url, headers=HEADERS).text
@@ -82,16 +96,21 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
     if not div_tile:
         return
 
+    # Check if appropriate bolig type
     bolig_type = _extract_bolig_type(bolig)
     if BOLIG_TYPES[bolig_type] is False:
         return
 
+    a_tag = bolig.find('a', class_='tile__image-container')
+    bolig_url = URL + a_tag['href']
+
+    # Check if apprpriate postal code
+    postal_code: int = _extract_postal_code(bolig_url)
+    in_range: bool = False
+
     address_paragraph_raw = div_tile.find('p', class_='tile__address')
     address_paragraph: str = address_paragraph_raw.text.replace(',', '')
     print(f"Extracting data from {address_paragraph}")
-
-    a_tag = bolig.find('a', class_='tile__image-container')
-    bolig_url = URL + a_tag['href']
 
     bolig_folder = Path(OUTPUT_PATH).joinpath(address_paragraph)
     _create_bolig_folder(bolig_folder)
@@ -108,6 +127,11 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
 
 def scrape() -> None:
     """Start scraping housing data from nybolig.dk"""
+    try:
+        _validate_config()
+    except ValueError as ve:
+        raise ve
+
     total_pages: int = _get_pages(PAGES)
     total_boliger: int = 0
 

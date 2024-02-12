@@ -14,8 +14,12 @@
       "helårsgrund": false,
       "fritidsgrund": false
     },
+    "postal_code_filters": {
+      "ranges": [[1000, 2900]],
+      "individual": [3100]
+    },
     "url": "https://www.nybolig.dk",
-    "max_pages": 2404,
+    "max_pages": 2256,
     "html_parser": "lxml",
     "listing_class": "list__item",
     "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3 Edge/16.16299"
