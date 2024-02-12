@@ -98,6 +98,8 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
 
     # Check if appropriate bolig type
     bolig_type = _extract_bolig_type(bolig)
+    if bolig_type not in BOLIG_TYPES:
+        return
     if BOLIG_TYPES[bolig_type] is False:
         return
 
@@ -105,7 +107,11 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
     bolig_url = URL + a_tag['href']
 
     # Check if appropriate postal code
-    postal_code: int = _extract_postal_code(bolig_url)
+    try:
+        postal_code: int = _extract_postal_code(bolig_url)
+    except ValueError as ve:
+        print(ve)
+        return
     in_range: bool = False
     in_individual: bool = False
     for postal_range in POSTAL_CODE_FILTERS['ranges']:
@@ -203,8 +209,10 @@ def _extract_price(soup: BeautifulSoup) -> int:
 
 def _extract_postal_code(url: str) -> int:
     # Extract the postal code from the url
-    postal_code: int = int(url.split('/')[4])
-    return postal_code
+    postal_code_raw: str = url.split('/')[4]
+    if not postal_code_raw.isdigit():
+        raise ValueError(f"Could not extract postal code from {url}")
+    return int(postal_code_raw)
 
 
 def _extract_address(soup: BeautifulSoup) -> str:
