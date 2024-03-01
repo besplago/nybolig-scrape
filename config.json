@@ -1,8 +1,8 @@
 {
   "output_path": "./output",
-  "pages": 600,
+  "pages": 2261,
   "include_images": false,
-  "override_previous_data": true,
+  "override_previous_data": false,
   "bolig_types": {
     "villa": false,
     "rækkehus": false,

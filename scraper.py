@@ -56,6 +56,7 @@ def _extract_bolig_data(bolig_url: str, bolig_type: str) -> tuple:
     bolig_data.update(_extract_bolig_facts_box(soup))
 
     # Extract floor plan from the bolig
+    # TODO: Problem when there are multiple floor plans, example: https://www.nybolig.dk/villa/2630/elmealle/105574/823108
     floor_plan_container = soup.find('div', class_='floorplan__drawing-container')
     if floor_plan_container:
         floor_plan_url = floor_plan_container.find(
@@ -103,15 +104,27 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
     if BOLIG_TYPES[bolig_type] is False:
         return
 
-    a_tag = bolig.find('a', class_='tile__image-container')
-    bolig_url = URL + a_tag['href']
-
     # Check if appropriate postal code
     try:
-        postal_code: int = _extract_postal_code(bolig_url)
+        postal_code: int = _extract_postal_code_page_wise(bolig)
     except ValueError as ve:
         print(ve)
         return
+
+    a_tag = bolig.find('a', class_='tile__image-container')
+    bolig_url = URL + a_tag['href']
+
+    # Check if redirecting to another page
+    bolig_url, bolig_site = _check_redirect(bolig_url)
+    # if 'viderestillingekstern' in bolig_url or 'estate.dk' in bolig_url:
+    #     # Remove the 'https://www.nybolig.dkhttps//' part of the url
+    #     bolig_url = bolig_url.replace('https://www.nybolig.dk', '')
+    #     print(f"New url: {bolig_url}")
+    #     # Follow the redirect
+    #     new_session = requests.Session()
+    #     bolig_url_redirect = new_session.get(bolig_url, headers=HEADERS).url
+    #     print(f"Redirected to: {bolig_url_redirect}")
+
     in_range: bool = False
     in_individual: bool = False
     for postal_range in POSTAL_CODE_FILTERS['ranges']:
@@ -151,7 +164,7 @@ def scrape() -> None:
     with ThreadPoolExecutor() as executor:
         futures: list = []
 
-        for page in range(1, total_pages + 1):
+        for page in range(600, total_pages + 1):
             sale_url: str = f"{URL}/til-salg?page={page}"
             soup: BeautifulSoup = _get_soup(sale_url)
             for bolig in soup.find_all('li', class_=LISTING_CLASS):
@@ -162,6 +175,24 @@ def scrape() -> None:
             future.result()
 
     print(f"Finished scraping {total_pages} pages")
+
+
+def _check_redirect(bolig_url: str) -> tuple:
+    supported_sites = ['danbolig', 'home', 'edc', 'estate', 'nybolig']
+    bolig_site: str = 'nybolig'
+    if 'viderestillingekstern' in bolig_url or 'estate.dk' in bolig_url:
+        # Remove the 'https://www.nybolig.dkhttps//' part of the url
+        bolig_url = bolig_url.replace('https://www.nybolig.dk', '')
+        # Follow the redirect
+        new_session = requests.Session()
+        bolig_url_redirect = new_session.get(bolig_url, headers=HEADERS).url
+        for supported_site in supported_sites:
+            if supported_site in bolig_url_redirect:
+                bolig_site = supported_site
+            else:
+                print(f"Redirected to: {bolig_url_redirect}")
+        bolig_site = 'estate'
+    return bolig_url, bolig_site
 
 
 def _get_soup(url: str) -> BeautifulSoup:
@@ -237,11 +268,18 @@ def _extract_address(soup: BeautifulSoup) -> str:
 
     return address
 
+def _extract_postal_code_page_wise(bolig: BeautifulSoup) -> int:
+    # Extract the postal code from the url
+    # Example: Tranevænget 2, 5610 Assens -> 5610, find the first number with 4 digits
+    address: str = bolig.find('p', class_='tile__address').text.strip()
+    postal_code_raw: str = [int(s) for s in address.split() if s.isdigit() and len(s) == 4][0]
+    postal_code: int = int(postal_code_raw)
+    return postal_code
+
 
 def _extract_bolig_type(bolig: BeautifulSoup) -> str:
     bolig_type_raw = bolig.find('p', class_='tile__mix').text.strip().lower()
     bolig_type = bolig_type_raw.split(' ')[0]
-
     return bolig_type
 
 

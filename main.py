@@ -32,7 +32,9 @@ def main():
                 converter.convert()
 
         end_time = time.time()
-        print(f"Time taken: {end_time - start_time} seconds")
+        print(
+            f"Time taken:\n{end_time - start_time} seconds\n{(end_time - start_time) / 60} minutes"
+        )
 
     except ValueError as ve:
         print(f"Value error: {ve}")
