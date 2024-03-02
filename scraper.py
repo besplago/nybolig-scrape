@@ -43,7 +43,9 @@ def _validate_config():
             )
 
 
-def _extract_bolig_data(bolig_url: str, bolig_type: str) -> tuple:
+def _extract_bolig_data(bolig_url: str, bolig_type: str, bolig_site: str) -> tuple:
+    # TODO: For each extraction function, there should be an appropriate handling depending on the
+    # given bolig_site string
     source: requests.Response = SESSION.get(bolig_url, headers=HEADERS).text
     soup = BeautifulSoup(source, HTML_PARSER)
     bolig_data: dict = {}
@@ -58,23 +60,11 @@ def _extract_bolig_data(bolig_url: str, bolig_type: str) -> tuple:
     bolig_data.update(_extract_bolig_facts_box(soup))
 
     # Extract floor plan from the bolig
-    # TODO: Problem when there are multiple floor plans, example: https://www.nybolig.dk/villa/2630/elmealle/105574/823108
-    floor_plan_container = soup.find("div", class_="floorplan__drawing-container")
-    if floor_plan_container:
-        floor_plan_url = floor_plan_container.find(
-            "img", class_="floorplan__drawing lazy"
-        ).get("data-src", "")
-        image_urls.append(floor_plan_url)
+    image_urls.append(_extract_floorplan(soup))
 
     # Extract the images from the bolig
     if INCLUDE_IMAGES:
-        for image_container in soup.find_all(
-            "div", class_="slider-image__image-container"
-        ):
-            img_tag = image_container.find("img", class_="slider-image__image")
-            if img_tag:
-                image_url = img_tag.get("data-src", "")
-                image_urls.append(image_url)
+        image_urls.append(_extract_images(soup))
 
     return bolig_data, image_urls
 
@@ -120,15 +110,8 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
 
     # Check if redirecting to another page
     bolig_url, bolig_site = _check_redirect(bolig_url)
-    # if 'viderestillingekstern' in bolig_url or 'estate.dk' in bolig_url:
-    #     # Remove the 'https://www.nybolig.dkhttps//' part of the url
-    #     bolig_url = bolig_url.replace('https://www.nybolig.dk', '')
-    #     print(f"New url: {bolig_url}")
-    #     # Follow the redirect
-    #     new_session = requests.Session()
-    #     bolig_url_redirect = new_session.get(bolig_url, headers=HEADERS).url
-    #     print(f"Redirected to: {bolig_url_redirect}")
-    return
+    if bolig_site == "unsupported":
+        return
 
     in_range: bool = False
     in_individual: bool = False
@@ -148,7 +131,7 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
 
     if OVERRIDE_PREVIOUS_DATA or not (bolig_folder / "data.json").exists():
         try:
-            bolig_data, images = _extract_bolig_data(bolig_url, bolig_type)
+            bolig_data, images = _extract_bolig_data(bolig_url, bolig_type, bolig_site)
             _save_data_and_images(bolig_folder, bolig_data, images)
             print(f"{address_paragraph} extracted")
         except requests.exceptions.RequestException as e:
@@ -183,53 +166,31 @@ def scrape() -> None:
     print(f"Finished scraping {total_pages} pages")
 
 
-supported_sites_encounters: dict = {
-    "danbolig": 0,
-    "home": 0,
-    "lokalbolig": 0,
-    "eltoftnielsen": 0,
-    "realmaeglerne": 0,
-    "boligsiden": 0,
-    "estate": 0,
-    "edc": 0,
-    "carlsbergbyen": 0,
-    "andliving": 0,
-    "fantasticfrank": 0,
-    "ronniekarlsson": 0,
-    "brikk": 0,
-    "bobasic": 0,
-    "thpr": 0,
-    "minbolighandel": 0,
-    "dmbolig": 0,
-    "johnfrandsen": 0,
-    "emk": 0,
-}
-
-
 def _check_redirect(bolig_url: str) -> tuple:
-    supported_sites = [
-        "danbolig",         # 918
+    supported_sites = [     # Number of listings (02/03/2024)
+        # "danbolig",         # 918
         "home",             # 1140
-        "lokalbolig",       # 372
-        "eltoftnielsen",    # 72
-        "realmaeglerne",    # 325
-        "boligsiden",       # 4
-        "estate",           # 346
-        "edc",              # 928
-        "carlsbergbyen",    # 165
-        "andliving",        # 63
-        "fantasticfrank",   # 12
-        "ronniekarlsson",   # 4
-        "brikk",            # 127
-        "bobasic",          # 6
-        "thpr",             # 10
-        "minbolighandel",   # 16
-        "dmbolig",          # 12
-        "johnfrandsen",     # 102
-        "emk",              # 25
+        # "lokalbolig",       # 372
+        # "eltoftnielsen",    # 72
+        # "realmaeglerne",    # 325
+        # "boligsiden",       # 4
+        # "estate",           # 346
+        # "edc",              # 928
+        # "carlsbergbyen",    # 165
+        # "andliving",        # 63
+        # "fantasticfrank",   # 12
+        # "ronniekarlsson",   # 4
+        # "brikk",            # 127
+        # "bobasic",          # 6
+        # "thpr",             # 10
+        # "minbolighandel",   # 16
+        # "dmbolig",          # 12
+        # "johnfrandsen",     # 102
+        # "emk",              # 25
     ]
     bolig_site: str = "nybolig"
     if "viderestillingekstern" in bolig_url or "estate.dk" in bolig_url:
+        bolig_site = "unsupported"
         # Remove the 'https://www.nybolig.dkhttps//' part of the url
         bolig_url = bolig_url.replace("https://www.nybolig.dk", "")
         # Follow the redirect
@@ -240,12 +201,10 @@ def _check_redirect(bolig_url: str) -> tuple:
             if supported_site in bolig_url_redirect:
                 bolig_site = supported_site
                 supported_site_found = True
-                supported_sites_encounters[supported_site] += 1
-                print(supported_sites_encounters)
                 break
         if not supported_site_found:
             print(f"Unsupported site: {bolig_url_redirect}")
-        bolig_site = "estate"
+        bolig_url = bolig_url_redirect
     return bolig_url, bolig_site
 
 
@@ -253,6 +212,30 @@ def _get_soup(url: str) -> BeautifulSoup:
     response = SESSION.get(url, headers=HEADERS)
     response.raise_for_status()  # Check if the request was successful
     return BeautifulSoup(response.text, HTML_PARSER)
+
+
+def _extract_floorplan(soup: BeautifulSoup) -> str:
+    # TODO: Problem when there are multiple floor plans,
+    # example: https://www.nybolig.dk/villa
+    floor_plan_container = soup.find("div", class_="floorplan__drawing-container")
+    if floor_plan_container:
+        floor_plan_url = floor_plan_container.find(
+            "img", class_="floorplan__drawing lazy"
+        ).get("data-src", "")
+        return floor_plan_url
+    return ""
+
+
+def _extract_images(soup: BeautifulSoup) -> str:
+    image_urls: list = []
+    for image_container in soup.find_all(
+        "div", class_="slider-image__image-container"
+    ):
+        img_tag = image_container.find("img", class_="slider-image__image")
+        if img_tag:
+            image_url = img_tag.get("data-src", "")
+            image_urls.append(image_url)
+    return image_urls
 
 
 def _extract_bolig_facts_box(soup: BeautifulSoup) -> dict:
