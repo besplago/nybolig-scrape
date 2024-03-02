@@ -128,6 +128,7 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
     #     new_session = requests.Session()
     #     bolig_url_redirect = new_session.get(bolig_url, headers=HEADERS).url
     #     print(f"Redirected to: {bolig_url_redirect}")
+    return
 
     in_range: bool = False
     in_individual: bool = False
@@ -168,7 +169,8 @@ def scrape() -> None:
     with ThreadPoolExecutor() as executor:
         futures: list = []
 
-        for page in range(600, total_pages + 1):
+        for page in range(400, total_pages + 1):
+            print(f"Scraping page {page} of {total_pages}")
             sale_url: str = f"{URL}/til-salg?page={page}"
             soup: BeautifulSoup = _get_soup(sale_url)
             for bolig in soup.find_all("li", class_=LISTING_CLASS):
@@ -181,14 +183,50 @@ def scrape() -> None:
     print(f"Finished scraping {total_pages} pages")
 
 
+supported_sites_encounters: dict = {
+    "danbolig": 0,
+    "home": 0,
+    "lokalbolig": 0,
+    "eltoftnielsen": 0,
+    "realmaeglerne": 0,
+    "boligsiden": 0,
+    "estate": 0,
+    "edc": 0,
+    "carlsbergbyen": 0,
+    "andliving": 0,
+    "fantasticfrank": 0,
+    "ronniekarlsson": 0,
+    "brikk": 0,
+    "bobasic": 0,
+    "thpr": 0,
+    "minbolighandel": 0,
+    "dmbolig": 0,
+    "johnfrandsen": 0,
+    "emk": 0,
+}
+
+
 def _check_redirect(bolig_url: str) -> tuple:
     supported_sites = [
-        "danbolig",
-        "home.dk",
-        "lokalbolig",
-        "eltoftnielsen",
-        "realmaeglerne",
-        "estate",
+        "danbolig",         # 918
+        "home",             # 1140
+        "lokalbolig",       # 372
+        "eltoftnielsen",    # 72
+        "realmaeglerne",    # 325
+        "boligsiden",       # 4
+        "estate",           # 346
+        "edc",              # 928
+        "carlsbergbyen",    # 165
+        "andliving",        # 63
+        "fantasticfrank",   # 12
+        "ronniekarlsson",   # 4
+        "brikk",            # 127
+        "bobasic",          # 6
+        "thpr",             # 10
+        "minbolighandel",   # 16
+        "dmbolig",          # 12
+        "johnfrandsen",     # 102
+        "emk",              # 25
     ]
     bolig_site: str = "nybolig"
     if "viderestillingekstern" in bolig_url or "estate.dk" in bolig_url:
@@ -197,12 +235,16 @@ def _check_redirect(bolig_url: str) -> tuple:
         # Follow the redirect
         new_session = requests.Session()
         bolig_url_redirect = new_session.get(bolig_url, headers=HEADERS).url
+        supported_site_found: bool = False
         for supported_site in supported_sites:
             if supported_site in bolig_url_redirect:
                 bolig_site = supported_site
-                print(f"\nFound supported site: {bolig_site}\n")
-            else:
-                print(f"Redirected to: {bolig_url_redirect}")
+                supported_site_found = True
+                supported_sites_encounters[supported_site] += 1
+                print(supported_sites_encounters)
+                break
+        if not supported_site_found:
+            print(f"Unsupported site: {bolig_url_redirect}")
         bolig_site = "estate"
     return bolig_url, bolig_site
 
