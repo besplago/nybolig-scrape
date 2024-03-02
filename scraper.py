@@ -53,7 +53,7 @@ def _extract_bolig_data(bolig_url: str, bolig_type: str, bolig_site: str) -> tup
 
     # Extract the data from the bolig
     bolig_data["url"] = bolig_url
-    bolig_data["address"] = _extract_address(soup)
+    bolig_data["address"] = _extract_address(soup, bolig_site)
     bolig_data["postal_code"] = _extract_postal_code(bolig_url)
     bolig_data["type"] = bolig_type
     bolig_data["price"] = _extract_price(soup)
@@ -285,26 +285,30 @@ def _extract_postal_code(url: str) -> int:
     return int(postal_code_raw)
 
 
-def _extract_address(soup: BeautifulSoup) -> str:
+def _extract_address(soup: BeautifulSoup, bolig_site: str) -> str:
+    # TODO: Move exractors into own module probably
     # Extract the address components and join them with a space
-    address_components = [
-        component.text.strip()
-        for component in soup.find_all(
-            "strong", class_="case-info__property__info__main__title__address"
-        )
-    ]
+    if bolig_site == "nybolig":
+        address_components = [
+            component.text.strip()
+            for component in soup.find_all(
+                "strong", class_="case-info__property__info__main__title__address"
+            )
+        ]
 
-    # Filter out empty components
-    address_components = [component for component in address_components if component]
+        # Filter out empty components
+        address_components = [component for component in address_components if component]
 
-    # Join the non-empty components with a space
-    address = " ".join(address_components)
+        # Join the non-empty components with a space
+        address = " ".join(address_components)
 
-    # Remove newline characters from the address
-    address = address.replace("\n", "")
+        # Remove newline characters from the address
+        address = address.replace("\n", "")
 
-    # Remove commas from the address
-    address = address.replace(",", "")
+        # Remove commas from the address
+        address = address.replace(",", "")
+    elif bolig_site == "home":
+        raise NotImplementedError("Extracting address from home.dk is not implemented")
 
     return address
 
