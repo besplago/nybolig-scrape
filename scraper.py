@@ -5,6 +5,18 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+
+
+# Debugging
+bolig_site_count: dict = {
+    "unsupported": 0,
+    "nybolig": 0,
+    "danbolig": 0,
+}
+error_count: dict = {}
+
 
 # Load configuration from file
 config_file_path: Path = Path(__file__).parent.joinpath("config.json")
@@ -54,17 +66,17 @@ def _extract_bolig_data(bolig_url: str, bolig_type: str, bolig_site: str) -> tup
     # Extract the data from the bolig
     bolig_data["url"] = bolig_url
     bolig_data["address"] = _extract_address(soup, bolig_site)
-    bolig_data["postal_code"] = _extract_postal_code(bolig_url)
+    bolig_data["postal_code"] = _extract_postal_code(bolig_url, bolig_site)
     bolig_data["type"] = bolig_type
-    bolig_data["price"] = _extract_price(soup)
-    bolig_data.update(_extract_bolig_facts_box(soup))
+    bolig_data["price"] = _extract_price(soup, bolig_site)
+    bolig_data.update(_extract_bolig_facts_box(soup, bolig_site, bolig_url))
 
     # Extract floor plan from the bolig
-    image_urls.append(_extract_floorplan(soup))
+    image_urls.append(_extract_floorplan(soup, bolig_site))
 
     # Extract the images from the bolig
     if INCLUDE_IMAGES:
-        image_urls.append(_extract_images(soup))
+        image_urls.append(_extract_images(soup, bolig_site))
 
     return bolig_data, image_urls
 
@@ -105,14 +117,6 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
         print(ve)
         return
 
-    a_tag = bolig.find("a", class_="tile__image-container")
-    bolig_url = URL + a_tag["href"]
-
-    # Check if redirecting to another page
-    bolig_url, bolig_site = _check_redirect(bolig_url)
-    if bolig_site == "unsupported":
-        return
-
     in_range: bool = False
     in_individual: bool = False
     for postal_range in POSTAL_CODE_FILTERS["ranges"]:
@@ -121,6 +125,14 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
     if postal_code in POSTAL_CODE_FILTERS["individual"]:
         in_individual = True
     if not (in_range or in_individual):
+        return
+
+    a_tag = bolig.find("a", class_="tile__image-container")
+    bolig_url = URL + a_tag["href"]
+
+    # Check if redirecting to another page
+    bolig_url, bolig_site = _check_redirect(bolig_url)
+    if bolig_site == "unsupported":
         return
 
     address_paragraph_raw = div_tile.find("p", class_="tile__address")
@@ -134,8 +146,14 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
             bolig_data, images = _extract_bolig_data(bolig_url, bolig_type, bolig_site)
             _save_data_and_images(bolig_folder, bolig_data, images)
             print(f"{address_paragraph} extracted")
-        except requests.exceptions.RequestException as e:
+            bolig_site_count[bolig_site] += 1  # NOTE: For debugging purposes
+        except Exception as e:
             print(f"Error extracting data from {bolig_url}: {e}")
+            # Count the times the same error has occured, if it does not exist, create it
+            if e not in error_count:
+                error_count[e] = 1
+            else:
+                error_count[e] += 1
     else:
         print(f"Skipping existing data in folder: {bolig_folder}")
 
@@ -152,7 +170,8 @@ def scrape() -> None:
     with ThreadPoolExecutor() as executor:
         futures: list = []
 
-        for page in range(400, total_pages + 1):
+        # for page in range(1, total_pages + 1):
+        for page in range(600, 630):
             print(f"Scraping page {page} of {total_pages}")
             sale_url: str = f"{URL}/til-salg?page={page}"
             soup: BeautifulSoup = _get_soup(sale_url)
@@ -164,12 +183,14 @@ def scrape() -> None:
             future.result()
 
     print(f"Finished scraping {total_pages} pages")
+    print(bolig_site_count)  # NOTE: For debugging purposes
+    print(error_count)  # NOTE: For debugging purposes
 
 
 def _check_redirect(bolig_url: str) -> tuple:
     supported_sites = [     # Number of listings (02/03/2024)
-        # "danbolig",         # 918
-        "home",             # 1140
+        "danbolig",         # 918
+        # "home",             # 1140 # NOTE: Currently hard to implement, since facts does not show up without JS
         # "lokalbolig",       # 372
         # "eltoftnielsen",    # 72
         # "realmaeglerne",    # 325
@@ -214,31 +235,40 @@ def _get_soup(url: str) -> BeautifulSoup:
     return BeautifulSoup(response.text, HTML_PARSER)
 
 
-def _extract_floorplan(soup: BeautifulSoup) -> str:
+def _extract_floorplan(soup: BeautifulSoup, bolig_site: str) -> str:
     # TODO: Problem when there are multiple floor plans,
     # example: https://www.nybolig.dk/villa
-    floor_plan_container = soup.find("div", class_="floorplan__drawing-container")
-    if floor_plan_container:
-        floor_plan_url = floor_plan_container.find(
-            "img", class_="floorplan__drawing lazy"
-        ).get("data-src", "")
-        return floor_plan_url
-    return ""
+    if bolig_site == "nybolig":
+        floor_plan_container = soup.find("div", class_="floorplan__drawing-container")
+        if floor_plan_container:
+            floor_plan_url = floor_plan_container.find(
+                "img", class_="floorplan__drawing lazy"
+            ).get("data-src", "")
+            return floor_plan_url
+    elif bolig_site == "danbolig":
+        floor_plan_container = soup.find("o-property-floorplan")
+        floor_plan_container = soup.find("o-property-floorplan")
+        if floor_plan_container:
+            floorplan2d = floor_plan_container.get(":floorplan2d", "")
+            floor_plan_url = floorplan2d.split('"url": "')[1].split('",')[0]
+            return floor_plan_url
+    raise ValueError("No floor plan found.")
 
 
-def _extract_images(soup: BeautifulSoup) -> str:
-    image_urls: list = []
-    for image_container in soup.find_all(
-        "div", class_="slider-image__image-container"
-    ):
-        img_tag = image_container.find("img", class_="slider-image__image")
-        if img_tag:
-            image_url = img_tag.get("data-src", "")
-            image_urls.append(image_url)
+def _extract_images(soup: BeautifulSoup, bolig_site: str) -> list:
+    if bolig_site == "nybolig":
+        image_urls: list = []
+        for image_container in soup.find_all(
+            "div", class_="slider-image__image-container"
+        ):
+            img_tag = image_container.find("img", class_="slider-image__image")
+            if img_tag:
+                image_url = img_tag.get("data-src", "")
+                image_urls.append(image_url)
     return image_urls
 
 
-def _extract_bolig_facts_box(soup: BeautifulSoup) -> dict:
+def _extract_bolig_facts_box(soup: BeautifulSoup, bolig_site: str, bolig_url: str) -> dict:
     bolig_data: dict = {
         "size": None,
         "basement_size": None,
@@ -248,45 +278,105 @@ def _extract_bolig_facts_box(soup: BeautifulSoup) -> dict:
         "energy_label": None,
     }
 
-    for fact in soup.find_all("div", class_="case-facts__box-inner-wrap"):
-        if "Boligareal" in fact.text:
-            bolig_data["size"] = int(fact.find("strong").text.split(" ")[0])
-        elif "Kælderstørrelse" in fact.text:
-            bolig_data["basement_size"] = int(fact.find("strong").text.split(" ")[0])
-        elif "Stue/Værelser" in fact.text:
-            living_rooms = int(fact.find("strong").text.split("/")[0])
-            rooms = int(fact.find("strong").text.split("/")[1])
-            bolig_data["rooms"] = living_rooms + rooms
-        elif "Bygget/Ombygget" in fact.text:
-            built_rebuilt_raw = fact.find("strong").text.split("/")
-            bolig_data["year_built"] = int(built_rebuilt_raw[0])
-            if len(built_rebuilt_raw) > 1:
-                bolig_data["year_rebuilt"] = int(built_rebuilt_raw[1])
-        elif "Energimærke" in fact.text:
-            bolig_data["energy_label"] = fact.contents[3].get("class")[1].split("-")[2]
+    if bolig_site == "nybolig":
+        for fact in soup.find_all("div", class_="case-facts__box-inner-wrap"):
+            if "Boligareal" in fact.text:
+                bolig_data["size"] = int(fact.find("strong").text.split(" ")[0])
+            elif "Kælderstørrelse" in fact.text:
+                bolig_data["basement_size"] = int(fact.find("strong").text.split(" ")[0])
+            elif "Stue/Værelser" in fact.text:
+                living_rooms = int(fact.find("strong").text.split("/")[0])
+                rooms = int(fact.find("strong").text.split("/")[1])
+                bolig_data["rooms"] = living_rooms + rooms
+            elif "Bygget/Ombygget" in fact.text:
+                built_rebuilt_raw = fact.find("strong").text.split("/")
+                bolig_data["year_built"] = int(built_rebuilt_raw[0])
+                if len(built_rebuilt_raw) > 1:
+                    bolig_data["year_rebuilt"] = int(built_rebuilt_raw[1])
+            elif "Energimærke" in fact.text:
+                bolig_data["energy_label"] = fact.contents[3].get("class")[1].split("-")[2]
+    elif bolig_site == "home":
+        # Press the "Se flere fakta" button to reveal all facts using selenium
+        driver = webdriver.Chrome()
+        driver.get(bolig_url)
+
+        button = driver.find_element(
+            By.XPATH, '//*[@id="__nuxt"]/div/div[3]/div[2]/div/div[2]/div[3]/div[2]/div/button'
+        )
+        driver.implicitly_wait(5)
+        button.click()
+
+
+        soup = BeautifulSoup(driver.page_source, HTML_PARSER)
+
+        for fact in soup.find_all("div", class_="property-details-facts-tab"):
+            print(fact.text)
+    elif bolig_site == "danbolig":
+        facts_table = soup.find("div", class_="m-table o-propertyPresentationInNumbers__table")
+        # Extract the table rows
+        rows = facts_table.find_all("tr")
+        for row in rows:
+            # Extract the table data
+            data = row.find_all("td")
+            if not data:
+                continue
+            if "Boligareal" in data[0].text:
+                bolig_data["size"] = int(data[1].text.split(" ")[0])
+            elif "Rum" in data[0].text:
+                bolig_data["rooms"] = int(data[1].text)
+            elif "Byggeår" in data[0].text:
+                bolig_data["year_built"] = int(data[1].text)
+            elif "Energimærke" in data[0].text:
+                bolig_data["energy_label"] = data[1].text
 
     return bolig_data
 
 
-def _extract_price(soup: BeautifulSoup) -> int:
-    price_raw = soup.find(
-        "span", class_="case-info__property__info__text__price"
-    ).text.strip()
-    # remove non-numeric characters
-    price = int("".join(filter(str.isdigit, price_raw)))
+def _extract_price(soup: BeautifulSoup, bolig_site: str) -> int:
+    if bolig_site == "nybolig":
+        price_raw = soup.find(
+            "span", class_="case-info__property__info__text__price"
+        ).text.strip()
+        # remove non-numeric characters
+        price = int("".join(filter(str.isdigit, price_raw)))
+    elif bolig_site == "home":
+        price_raw = soup.find("h3", class_="property-details-information__fact").text.strip()
+        # remove non-numeric characters
+        price = int("".join(filter(str.isdigit, price_raw)))
+    elif bolig_site == "danbolig":
+        a_label = soup.find("li", class_="a-label u-none md:u-flex").text.strip()
+        # remove non-numeric characters
+        price = int("".join(filter(str.isdigit, a_label)))
+
     return price
 
 
-def _extract_postal_code(url: str) -> int:
-    # Extract the postal code from the url
-    postal_code_raw: str = url.split("/")[4]
-    if not postal_code_raw.isdigit():
-        raise ValueError(f"Could not extract postal code from {url}")
+def _extract_postal_code(url: str, bolig_site: str) -> int:
+    if bolig_site == "nybolig":
+        # Extract the postal code from the url
+        postal_code_raw: str = url.split("/")[4]
+        if not postal_code_raw.isdigit():
+            raise ValueError(f"Could not extract postal code from {url}")
+    elif bolig_site == "home":
+        # Extract the postal code from the url
+        for s in url.split("-"):
+            if s.isdigit() and len(s) == 4:
+                postal_code_raw = s
+                break
+        if not postal_code_raw.isdigit():
+            raise ValueError(f"Could not extract postal code from {url}")
+    elif bolig_site == "danbolig":
+        # Extract the postal code from the url
+        for s in url.split("/"):
+            if s.isdigit() and len(s) == 4:
+                postal_code_raw = s
+                break
+        if not postal_code_raw.isdigit():
+            raise ValueError(f"Could not extract postal code from {url}")
     return int(postal_code_raw)
 
 
 def _extract_address(soup: BeautifulSoup, bolig_site: str) -> str:
-    # TODO: Move exractors into own module probably
     # Extract the address components and join them with a space
     if bolig_site == "nybolig":
         address_components = [
@@ -308,7 +398,24 @@ def _extract_address(soup: BeautifulSoup, bolig_site: str) -> str:
         # Remove commas from the address
         address = address.replace(",", "")
     elif bolig_site == "home":
-        raise NotImplementedError("Extracting address from home.dk is not implemented")
+        address = soup.find("h3", class_="h3--bold").text.strip()
+
+        # Remove newline characters from the address
+        address = address.replace("\n", "")
+
+        # Remove commas from the address
+        address = address.replace(",", "")
+    elif bolig_site == "danbolig":
+        address = soup.find("h1", class_="a-lead o-propertyHero__address").text.strip()
+
+        # Remove newline characters from the address
+        address = address.replace("\n", "")
+
+        # Remove commas from the address
+        address = address.replace(",", "")
+
+        # Remove spaces that are more than one
+        address = " ".join(address.split())
 
     return address
 
