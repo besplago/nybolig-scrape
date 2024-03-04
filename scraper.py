@@ -190,13 +190,13 @@ def scrape() -> None:
 def _check_redirect(bolig_url: str) -> tuple:
     supported_sites = [     # Number of listings (02/03/2024)
         "danbolig",         # 918
-        # "home",             # 1140 # NOTE: Currently hard to implement, since facts does not show up without JS
+        # "home",             # 1140 # NOTE: facts does not show up without JS, so hard to extract
         # "lokalbolig",       # 372
         # "eltoftnielsen",    # 72
         # "realmaeglerne",    # 325
         # "boligsiden",       # 4
-        # "estate",           # 346
-        # "edc",              # 928
+        "estate",           # 346
+        # "edc",              # 928 # NOTE: protected by WAF
         # "carlsbergbyen",    # 165
         # "andliving",        # 63
         # "fantasticfrank",   # 12
@@ -252,6 +252,8 @@ def _extract_floorplan(soup: BeautifulSoup, bolig_site: str) -> str:
             floorplan2d = floor_plan_container.get(":floorplan2d", "")
             floor_plan_url = floorplan2d.split('"url": "')[1].split('",')[0]
             return floor_plan_url
+    elif bolig_site == "estate":
+        floor_plan_url = soup.find("img", class_="floorplan__drawing lazy").get("data-src", "")
     raise ValueError("No floor plan found.")
 
 
@@ -328,6 +330,22 @@ def _extract_bolig_facts_box(soup: BeautifulSoup, bolig_site: str, bolig_url: st
                 bolig_data["year_built"] = int(data[1].text)
             elif "Energimærke" in data[0].text:
                 bolig_data["energy_label"] = data[1].text
+    elif bolig_site == "estate":
+        facts_box = soup.find("div", class_="case-facts__box")
+        facts = facts_box.find_all("div", class_="case-facts__box-inner-wrap")
+        for fact in facts:
+            if "Boligareal" in fact.text:
+                bolig_data["size"] = int(fact.find("strong").text.split(" ")[0])
+            elif "Stue/Værelser" in fact.text:
+                living_rooms = int(fact.find("strong").text.split("/")[0])
+                rooms = int(fact.find("strong").text.split("/")[1])
+                bolig_data["rooms"] = living_rooms + rooms
+            elif "Bygget/Ombygget" in fact.text:
+                # Sometimes only the year built is present
+                built_rebuilt_raw = fact.find("strong").text.split("/")
+                bolig_data["year_built"] = int(built_rebuilt_raw[0])
+                if len(built_rebuilt_raw) > 1:
+                    bolig_data["year_rebuilt"] = int(built_rebuilt_raw[1])
 
     return bolig_data
 
@@ -347,6 +365,12 @@ def _extract_price(soup: BeautifulSoup, bolig_site: str) -> int:
         a_label = soup.find("li", class_="a-label u-none md:u-flex").text.strip()
         # remove non-numeric characters
         price = int("".join(filter(str.isdigit, a_label)))
+    elif bolig_site == "estate":
+        price_raw = soup.find(
+            "span", class_="case-info__property__info__text__price"
+        ).text.strip()
+        # remove non-numeric characters
+        price = int("".join(filter(str.isdigit, price_raw)))
 
     return price
 
@@ -365,7 +389,7 @@ def _extract_postal_code(url: str, bolig_site: str) -> int:
                 break
         if not postal_code_raw.isdigit():
             raise ValueError(f"Could not extract postal code from {url}")
-    elif bolig_site == "danbolig":
+    elif bolig_site == "danbolig" or bolig_site == "estate":
         # Extract the postal code from the url
         for s in url.split("/"):
             if s.isdigit() and len(s) == 4:
@@ -407,6 +431,20 @@ def _extract_address(soup: BeautifulSoup, bolig_site: str) -> str:
         address = address.replace(",", "")
     elif bolig_site == "danbolig":
         address = soup.find("h1", class_="a-lead o-propertyHero__address").text.strip()
+
+        # Remove newline characters from the address
+        address = address.replace("\n", "")
+
+        # Remove commas from the address
+        address = address.replace(",", "")
+
+        # Remove spaces that are more than one
+        address = " ".join(address.split())
+    elif bolig_site == "edc":
+        address1 = soup.find("h1", class_=" font-bold md:style-h3").text.strip()
+        address2 = soup.find("span", class_="block md:text-primary-dusty").text.strip()
+    elif bolig_site == "estate":
+        address = soup.find("h1", class_="case-info__property__info__main__title").text.strip()
 
         # Remove newline characters from the address
         address = address.replace("\n", "")
