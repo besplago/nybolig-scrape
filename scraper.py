@@ -170,8 +170,8 @@ def scrape() -> None:
     with ThreadPoolExecutor() as executor:
         futures: list = []
 
-        # for page in range(1, total_pages + 1):
-        for page in range(600, 630):
+        for page in range(1, total_pages + 1):
+        # for page in range(600, 630):
             print(f"Scraping page {page} of {total_pages}")
             sale_url: str = f"{URL}/til-salg?page={page}"
             soup: BeautifulSoup = _get_soup(sale_url)
