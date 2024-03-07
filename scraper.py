@@ -10,11 +10,6 @@ from selenium.webdriver.common.by import By
 
 
 # Debugging
-bolig_site_count: dict = {
-    "unsupported": 0,
-    "nybolig": 0,
-    "danbolig": 0,
-}
 error_count: dict = {}
 
 
@@ -56,8 +51,6 @@ def _validate_config():
 
 
 def _extract_bolig_data(bolig_url: str, bolig_type: str, bolig_site: str) -> tuple:
-    # TODO: For each extraction function, there should be an appropriate handling depending on the
-    # given bolig_site string
     source: requests.Response = SESSION.get(bolig_url, headers=HEADERS).text
     soup = BeautifulSoup(source, HTML_PARSER)
     bolig_data: dict = {}
@@ -146,7 +139,6 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
             bolig_data, images = _extract_bolig_data(bolig_url, bolig_type, bolig_site)
             _save_data_and_images(bolig_folder, bolig_data, images)
             print(f"{address_paragraph} extracted")
-            bolig_site_count[bolig_site] += 1  # NOTE: For debugging purposes
         except Exception as e:
             print(f"Error extracting data from {bolig_url}: {e}")
             # Count the times the same error has occured, if it does not exist, create it
@@ -171,7 +163,7 @@ def scrape() -> None:
         futures: list = []
 
         for page in range(1, total_pages + 1):
-        # for page in range(600, 630):
+        # for page in range(600, 650):
             print(f"Scraping page {page} of {total_pages}")
             sale_url: str = f"{URL}/til-salg?page={page}"
             soup: BeautifulSoup = _get_soup(sale_url)
@@ -183,7 +175,6 @@ def scrape() -> None:
             future.result()
 
     print(f"Finished scraping {total_pages} pages")
-    print(bolig_site_count)  # NOTE: For debugging purposes
     print(error_count)  # NOTE: For debugging purposes
 
 
@@ -191,7 +182,7 @@ def _check_redirect(bolig_url: str) -> tuple:
     supported_sites = [     # Number of listings (02/03/2024)
         "danbolig",         # 918
         # "home",             # 1140 # NOTE: facts does not show up without JS, so hard to extract
-        # "lokalbolig",       # 372
+        "lokalbolig",       # 372
         # "eltoftnielsen",    # 72
         # "realmaeglerne",    # 325
         # "boligsiden",       # 4
@@ -254,6 +245,8 @@ def _extract_floorplan(soup: BeautifulSoup, bolig_site: str) -> str:
             return floor_plan_url
     elif bolig_site == "estate":
         floor_plan_url = soup.find("img", class_="floorplan__drawing lazy").get("data-src", "")
+    elif bolig_site == "lokalbolig":
+        floor_plan_url = soup.find("img", class_="object-contain").get("src", "")
     raise ValueError("No floor plan found.")
 
 
@@ -346,6 +339,25 @@ def _extract_bolig_facts_box(soup: BeautifulSoup, bolig_site: str, bolig_url: st
                 bolig_data["year_built"] = int(built_rebuilt_raw[0])
                 if len(built_rebuilt_raw) > 1:
                     bolig_data["year_rebuilt"] = int(built_rebuilt_raw[1])
+    elif bolig_site == "lokalbolig":
+        # Find all divs with the class "flex justify-between [&:nth-child(even)]:bg-lighter px-5 py-2 md:px-4"
+        facts = soup.find_all("div", class_="flex justify-between [&:nth-child(even)]:bg-lighter px-5 py-2 md:px-4")
+        for fact in facts:
+            label = fact.contents[0].text
+            if "Boligareal" in label:
+                area_raw = fact.contents[1].text
+                # remove non-numeric characters
+                area = "".join(filter(str.isdigit, area_raw))
+                # remove the last character, which is a **2
+                area = int(area[:-1])
+                bolig_data["size"] = area
+            elif "Værelser inkl. stuer" in label:
+                rooms = int(fact.contents[1].text)
+                bolig_data["rooms"] = rooms
+            elif "Byggeår" in label:
+                bolig_data["year_built"] = int(fact.contents[1].text)
+            elif "Energimærke" in label:
+                bolig_data["energy_label"] = fact.contents[1].text
 
     return bolig_data
 
@@ -371,6 +383,10 @@ def _extract_price(soup: BeautifulSoup, bolig_site: str) -> int:
         ).text.strip()
         # remove non-numeric characters
         price = int("".join(filter(str.isdigit, price_raw)))
+    elif bolig_site == "lokalbolig":
+        price_raw = soup.find("div", class_="flex justify-between").contents[1].text.strip()
+        # remove non-numeric characters
+        price = int("".join(filter(str.isdigit, price_raw)))
 
     return price
 
@@ -389,7 +405,7 @@ def _extract_postal_code(url: str, bolig_site: str) -> int:
                 break
         if not postal_code_raw.isdigit():
             raise ValueError(f"Could not extract postal code from {url}")
-    elif bolig_site == "danbolig" or bolig_site == "estate":
+    elif bolig_site == "danbolig" or bolig_site == "estate" or bolig_site == "lokalbolig":
         # Extract the postal code from the url
         for s in url.split("/"):
             if s.isdigit() and len(s) == 4:
@@ -445,6 +461,20 @@ def _extract_address(soup: BeautifulSoup, bolig_site: str) -> str:
         address2 = soup.find("span", class_="block md:text-primary-dusty").text.strip()
     elif bolig_site == "estate":
         address = soup.find("h1", class_="case-info__property__info__main__title").text.strip()
+
+        # Remove newline characters from the address
+        address = address.replace("\n", "")
+
+        # Remove commas from the address
+        address = address.replace(",", "")
+
+        # Remove spaces that are more than one
+        address = " ".join(address.split())
+    elif bolig_site == "lokalbolig":
+        div = soup.find("div", class_="flex flex-col gap-3").contents[1]
+        address1 = div.contents[0].contents[0].text.strip()
+        address2 = div.contents[1].text.strip()
+        address = f"{address1} {address2}"
 
         # Remove newline characters from the address
         address = address.replace("\n", "")
