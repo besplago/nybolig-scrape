@@ -1,4 +1,4 @@
-"""A script for scraping housing data from nybolig.dk"""
+"""A script for scraping estate data from nybolig.dk"""
 
 import json
 from concurrent.futures import ThreadPoolExecutor
@@ -361,7 +361,6 @@ def _extract_bolig_facts_box(
                 if len(built_rebuilt_raw) > 1:
                     bolig_data["year_rebuilt"] = int(built_rebuilt_raw[1])
     elif bolig_site == "lokalbolig":
-        # Find all divs with the class "flex justify-between [&:nth-child(even)]:bg-lighter px-5 py-2 md:px-4"
         facts = soup.find_all(
             "div",
             class_="flex justify-between [&:nth-child(even)]:bg-lighter px-5 py-2 md:px-4",
