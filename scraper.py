@@ -540,7 +540,7 @@ def _extract_bolig_type(bolig: BeautifulSoup) -> str:
 
 
 def _get_pages(pages: int) -> int:
-    if pages > MAX_PAGES:
+    if pages > MAX_PAGES or pages < 1:
         print(f"Max pages is {MAX_PAGES}, continuing with {MAX_PAGES} pages")
         pages = MAX_PAGES
     return pages
