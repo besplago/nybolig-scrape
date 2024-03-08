@@ -33,5 +33,6 @@ def check_duplicates():
     if not duplicate_found:
         print("No duplicate addresses found.")
 
+
 if __name__ == "__main__":
     check_duplicates()
