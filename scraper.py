@@ -239,8 +239,11 @@ def _check_redirect(bolig_url: str) -> tuple:
 
 def _extract_floorplan(soup: BeautifulSoup, bolig_site: str) -> str:
     # TODO: Problem when there are multiple floor plans,
-    # example: https://www.nybolig.dk/villa
+    # Example: https://www.nybolig.dk/ejerlejlighed/2840/kongevejen/104242/297423
     if bolig_site == "nybolig":
+        slider_controls = soup.find("nav", class_="sliderControls")
+        if len(slider_controls.contents) != 7:
+            raise ValueError("No floor plan found.")
         floor_plan_container = soup.find("div", class_="floorplan__drawing-container")
         if floor_plan_container:
             floor_plan_url = floor_plan_container.find(
