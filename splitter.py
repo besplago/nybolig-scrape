@@ -62,4 +62,4 @@ def split_data(n: int, split: list = None) -> None:
     print("Data split complete.")
 
 if __name__ == "__main__":
-    split_data(2, [0.7, 0.3])
+    split_data(2, [0.5, 0.5])
