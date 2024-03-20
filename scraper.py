@@ -147,13 +147,15 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
 
     address_paragraph_raw = div_tile.find("p", class_="tile__address")
     address_paragraph: str = address_paragraph_raw.text.replace(",", "")
+    address_paragraph = address_paragraph.replace("\n", "")
+    address_paragraph = address_paragraph.replace(" ", "_")
 
     bolig_folder = Path(OUTPUT_PATH).joinpath(address_paragraph)
-    _create_bolig_folder(bolig_folder)
 
     if OVERRIDE_PREVIOUS_DATA or not (bolig_folder / "data.json").exists():
         try:
             bolig_data, images = _extract_bolig_data(bolig_url, bolig_type, bolig_site)
+            _create_bolig_folder(bolig_folder)
             _save_data_and_images(bolig_folder, bolig_data, images)
             print(f"{address_paragraph} extracted")
         except Exception as e:
@@ -224,7 +226,11 @@ def _check_redirect(bolig_url: str) -> tuple:
         bolig_url = bolig_url.replace("https://www.nybolig.dk", "")
         # Follow the redirect
         new_session = requests.Session()
-        bolig_url_redirect = new_session.get(bolig_url, headers=HEADERS).url
+        try:
+            bolig_url_redirect = new_session.get(bolig_url, headers=HEADERS).url
+        except UnicodeDecodeError:
+            print(f"UnicodeDecodeError: {bolig_url}")
+            return bolig_url, bolig_site
         supported_site_found: bool = False
         for supported_site in supported_sites:
             if supported_site in bolig_url_redirect:
@@ -546,3 +552,6 @@ def _get_pages(pages: int) -> int:
         print(f"Max pages is {MAX_PAGES}, continuing with {MAX_PAGES} pages")
         pages = MAX_PAGES
     return pages
+
+if __name__ == "__main__":
+    scrape()

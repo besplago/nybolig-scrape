@@ -24,3 +24,6 @@ def convert() -> None:
         csv_file.write("\n".join(csv))
 
     print("Conversion complete.")
+
+if __name__ == "__main__":
+    convert()

@@ -1,5 +1,5 @@
 {
-  "output_path": "./output",
+  "output_path": "./output/part_1",
   "pages": 0,
   "include_images": false,
   "override_previous_data": true,
