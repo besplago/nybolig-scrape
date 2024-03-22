@@ -7,7 +7,7 @@ import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-
+import pandas as pd
 
 # Debugging
 error_count: dict = {}
@@ -54,6 +54,84 @@ def _get_max_pages() -> int:
 MAX_PAGES: int = _get_max_pages()
 
 
+def _load_postal_avg_sqm_price() -> dict:
+    """
+    Note:
+        Data from: https://rkr.statistikbank.dk/statbank5a/SelectVarVal/Define.asp?MainTable=BM011
+        Settings:
+            Postnumre: Marker alle
+            Ejendomskategori: Ejerlejlighed
+            Priser på realiserede handler: Realiseret handlspris
+            Kvartal: 2023K1, 2023K2, 2023K3, 2023K4
+    """
+    df = pd.read_csv(
+        "./postal_avg_sqm_price.csv",
+        delimiter=";",
+        encoding="utf-8",
+        index_col=2,
+        header=0,
+    )
+    # Remove the first two columns
+    df = df.drop(df.columns[[0, 1]], axis=1)
+    # Make all values integers, if they cannot be converted, they will be 0
+    df = df.apply(pd.to_numeric, errors="coerce")
+    # Iterate each row and calculate the average price per square meter. If a column contains a 0,
+    # it will be ignored in the calculation.
+    for index, row in df.iterrows():
+        avg_price = 0
+        count = 0
+        for value in row:
+            if value != 0:
+                avg_price += value
+                count += 1
+        if count != 0:
+            df.at[index, "postal_avg_sqm_price"] = avg_price / count
+        else:
+            df.at[index, "postal_avg_sqm_price"] = 0
+
+    # Remove the columns that are not needed
+    df = df.drop(df.columns[[0, 1, 2, 3]], axis=1)
+
+    # Turn into a dictionary
+    postal_avg_sqm_price = df.to_dict()
+    # The dict is nested, remove the nesting
+    postal_avg_sqm_price = postal_avg_sqm_price["postal_avg_sqm_price"]
+    # Fill all NaN values with 0
+    postal_avg_sqm_price = {
+        key: 0.0 if pd.isna(value) else value
+        for key, value in postal_avg_sqm_price.items()
+    }
+
+    # Update the keys to be integers. They can be of to formats: "1000-1499 Kbh.K." or
+    # "2000 Frederiksberg". The first format will be converted to such that each postal code in the
+    # range will be a separate row in the dataframe. The second format will be converted to an
+    # integer.
+    for key in list(postal_avg_sqm_price):
+        if "-" in key:
+            start, end = key.split("-")
+            # remove non-numeric characters
+            start = int("".join(filter(str.isdigit, start)))
+            if not any(char.isdigit() for char in end):
+                postal_code = int("".join(filter(str.isdigit, key)))
+                postal_avg_sqm_price[postal_code] = postal_avg_sqm_price[key]
+                postal_avg_sqm_price.pop(key)
+                continue
+            end = int("".join(filter(str.isdigit, end)))
+            for postal_code in range(start, end + 1):
+                postal_avg_sqm_price[postal_code] = postal_avg_sqm_price[key]
+            postal_avg_sqm_price.pop(key)
+        else:
+            # remove non-numeric characters
+            postal_code = int("".join(filter(str.isdigit, key)))
+            postal_avg_sqm_price[postal_code] = postal_avg_sqm_price[key]
+            postal_avg_sqm_price.pop(key)
+
+    return postal_avg_sqm_price
+
+
+POSTAL_AVG_SQM_PRICE: dict = _load_postal_avg_sqm_price()
+
+
 def _validate_config():
     for postal_range in POSTAL_CODE_FILTERS["ranges"]:
         if len(postal_range) != 2:
@@ -79,6 +157,7 @@ def _extract_bolig_data(bolig_url: str, bolig_type: str, bolig_site: str) -> tup
     bolig_data["postal_code"] = _extract_postal_code(bolig_url, bolig_site)
     bolig_data["type"] = bolig_type
     bolig_data["price"] = _extract_price(soup, bolig_site)
+    bolig_data["postal_avg_sqm_price"] = POSTAL_AVG_SQM_PRICE.get(bolig_data["postal_code"], 0.0)
     bolig_data.update(_extract_bolig_facts_box(soup, bolig_site, bolig_url))
 
     # Extract floor plan from the bolig
@@ -159,12 +238,13 @@ def _process_bolig(bolig: BeautifulSoup) -> None:
             _save_data_and_images(bolig_folder, bolig_data, images)
             print(f"{address_paragraph} extracted")
         except Exception as e:
-            print(f"Error extracting data from {bolig_url}: {e}")
+            error_string: str = str(e)
+            print(f"Error extracting data from {bolig_url}: {error_string}")
             # Count the times the same error has occured, if it does not exist, create it
-            if e not in error_count:
-                error_count[e] = 1
+            if error_string not in error_count:
+                error_count[error_string] = 1
             else:
-                error_count[e] += 1
+                error_count[error_string] += 1
     else:
         print(f"Skipping existing data in folder: {bolig_folder}")
 
@@ -552,6 +632,7 @@ def _get_pages(pages: int) -> int:
         print(f"Max pages is {MAX_PAGES}, continuing with {MAX_PAGES} pages")
         pages = MAX_PAGES
     return pages
+
 
 if __name__ == "__main__":
     scrape()

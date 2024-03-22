@@ -1,6 +1,7 @@
 venv/
 env/
 output/
+output_old/
 nybolig_data.csv
 
 # VSC
