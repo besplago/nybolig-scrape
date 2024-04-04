@@ -17,8 +17,8 @@ WANTED_DATA: list = [
     "year_rebuilt",
     "energy_label",
     "postal_avg_sqm_price",
-    # "lat",
-    # "lng",
+    "lat",
+    "lng",
 ]
 
 UNWANTED_DATA: dict = {
