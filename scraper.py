@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 import pandas as pd
+import coordinates
 
 # Debugging
 error_count: dict = {}
@@ -154,10 +155,15 @@ def _extract_bolig_data(bolig_url: str, bolig_type: str, bolig_site: str) -> tup
     # Extract the data from the bolig
     bolig_data["url"] = bolig_url
     bolig_data["address"] = _extract_address(soup, bolig_site)
+    bolig_data["lattitude"], bolig_data["longitude"] = coordinates.get_coordinates(
+        bolig_data["address"]
+    )
     bolig_data["postal_code"] = _extract_postal_code(bolig_url, bolig_site)
     bolig_data["type"] = bolig_type
     bolig_data["price"] = _extract_price(soup, bolig_site)
-    bolig_data["postal_avg_sqm_price"] = POSTAL_AVG_SQM_PRICE.get(bolig_data["postal_code"], 0.0)
+    bolig_data["postal_avg_sqm_price"] = POSTAL_AVG_SQM_PRICE.get(
+        bolig_data["postal_code"], 0.0
+    )
     bolig_data.update(_extract_bolig_facts_box(soup, bolig_site, bolig_url))
 
     # Extract floor plan from the bolig
@@ -478,7 +484,7 @@ def _extract_price(soup: BeautifulSoup, bolig_site: str) -> int:
     if bolig_site == "nybolig":
         price_raw = soup.find(
             "span", class_="case-info__property__info__text__price"
-        ).text.strip()
+        ).text.strip() # TODO: They changed their fkn website
         # remove non-numeric characters
         price = int("".join(filter(str.isdigit, price_raw)))
     elif bolig_site == "home":

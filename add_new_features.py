@@ -3,6 +3,7 @@ import os
 import threading
 import json
 import pandas as pd
+from coordinates import get_coordinates
 
 OUTPUT_FOLDER_PATH: str = r"./output/part_1"
 
@@ -89,7 +90,15 @@ def add_postal_avg_sqm_price(bolig_data: dict) -> dict:
     postal_avg_sqm_price = _load_postal_avg_sqm_price()
     postal_code = bolig_data["postal_code"]
     bolig_data["postal_avg_sqm_price"] = postal_avg_sqm_price.get(postal_code, 0)
-    print(f"Added postal_avg_sqm_price to {bolig_data['address']}")
+    return bolig_data
+
+def add_coordinates(bolig_data: dict) -> dict:
+    """Adds the coordinates to the bolig data."""
+    if "lat" in bolig_data and "lng" in bolig_data:
+        return bolig_data
+    address: str = bolig_data["address"]
+    bolig_data["lat"], bolig_data["lng"] = get_coordinates(address)
+    print(f"Coordinates for {address}: {bolig_data['lat'], bolig_data['lng']}")
     return bolig_data
 
 
@@ -103,6 +112,7 @@ def add_new_features(bolig_folder: str) -> None:
     with open(data_path, "r", encoding="utf-8") as file:
         bolig_data = json.load(file)
     bolig_data = add_postal_avg_sqm_price(bolig_data)
+    bolig_data = add_coordinates(bolig_data)
     with open(data_path, "w", encoding="utf-8") as file:
         json.dump(bolig_data, file, indent=4, ensure_ascii=False)
 
