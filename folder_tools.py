@@ -51,6 +51,7 @@ def rename_folders(path):
 
 def remove_empty_data() -> None:
     """Removes any folders with an empty data.json file."""
+    count: int = 0
     for root, dirs, _ in os.walk("output", topdown=False):
         for name in dirs:
             dir_path = os.path.join(root, name)
@@ -62,6 +63,8 @@ def remove_empty_data() -> None:
             if not data:
                 os.rmdir(dir_path)
                 print(f"Removed folder: {dir_path}")
+                count += 1
+    print(f"Removed {count} empty data folders.")
 
 
 def remove_unwanted_data() -> None:

@@ -32,6 +32,7 @@ def get_coordinates(address: str) -> tuple:
             except KeyError:
                 print(f"Could not get coordinates for {address}")
                 return (0, 0)
+        return data["lat"], data["lng"]
     except requests.exceptions.RequestException as e:
         print(f"Could not get coordinates for {address}: {e}")
         return (0, 0)
