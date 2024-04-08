@@ -78,20 +78,23 @@ def remove_unwanted_data() -> None:
             file_path = os.path.join(root, file)
             with open(file_path, "r", encoding="utf-8") as file:
                 data = json.load(file)
+            unwanted_encountered = False
             for key in list(data):
                 if key not in WANTED_DATA:
                     data.pop(key)
                     msg += f"Removed {key} from {file_path}\n"
-                    count += 1
+                    unwanted_encountered = True
                 elif key in UNWANTED_DATA and data[key] == UNWANTED_DATA[key]:
                     data.pop(key)
                     msg += f"Removed {key} from {file_path}\n"
-                    count += 1
-            with open(file_path, "w", encoding="utf-8") as file:
-                json.dump(data, file, indent=4, ensure_ascii=False)
-            if msg:
-                print(msg)
-    print(f"Removed {count} unwanted data.")
+                    unwanted_encountered = True
+            if unwanted_encountered:
+                count += 1
+                with open(file_path, "w", encoding="utf-8") as file:
+                    json.dump(data, file, indent=4, ensure_ascii=False)
+                if msg:
+                    print(msg)
+    print(f"Removed {count} files containing unwanted data.")
 
 
 if __name__ == "__main__":

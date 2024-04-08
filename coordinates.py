@@ -24,7 +24,7 @@ def get_coordinates(address: str) -> tuple:
             print(f"Could not get coordinates for {address}")
             address = " ".join(address_parts)
             print(f"Trying again with {address}")
-            response = requests.get(f"http://geoapi.dk/?q={address}", timeout=200)
+            response = requests.get(f"http://geoapi.dk/?q={address}", timeout=600)
             response.raise_for_status()
             data = response.json()
             try:
