@@ -1,6 +1,7 @@
 """Folder tools"""
 
 import os
+import shutil
 import json
 
 
@@ -58,10 +59,16 @@ def remove_empty_data() -> None:
             data_path = os.path.join(dir_path, "data.json")
             if not os.path.exists(data_path):
                 continue
-            with open(data_path, "r", encoding="utf-8") as file:
-                data = json.load(file)
-            if not data:
-                os.rmdir(dir_path)
+            # Check if the data.json file is empty
+            try:
+                with open(data_path, "r", encoding="utf-8") as file:
+                    data = json.load(file)
+                if not data:
+                    os.rmdir(dir_path)
+                    print(f"Removed folder: {dir_path}")
+                    count += 1
+            except json.JSONDecodeError:
+                shutil.rmtree(dir_path)
                 print(f"Removed folder: {dir_path}")
                 count += 1
     print(f"Removed {count} empty data folders.")
@@ -97,6 +104,26 @@ def remove_unwanted_data() -> None:
     print(f"Removed {count} files containing unwanted data.")
 
 
+def list_missing_data() -> None:
+    """Lists all entries with missing data."""
+    for root, _, files in os.walk("output", topdown=False):
+        for file in files:
+            if file != "data.json":
+                continue
+            file_path = os.path.join(root, file)
+            with open(file_path, "r", encoding="utf-8") as file:
+                data = json.load(file)
+            missing_data = []
+            for key in WANTED_DATA:
+                if key not in data:
+                    missing_data.append(key)
+            if missing_data:
+                print(f"Missing data in {file_path}: {missing_data}")
+
+
 if __name__ == "__main__":
-    remove_unwanted_data()
     remove_empty_data()
+    remove_unwanted_data()
+    list_missing_data()
+    with open("address_errors.json", "w", encoding="utf-8") as file:
+        json.dump({}, file, indent=4, ensure_ascii=False)

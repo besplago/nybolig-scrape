@@ -6,6 +6,7 @@ import pandas as pd
 from coordinates import get_coordinates
 
 OUTPUT_FOLDER_PATH: str = r"./output/part_1"
+file_lock = threading.Lock()
 
 
 def _load_postal_avg_sqm_price() -> dict:
@@ -98,6 +99,16 @@ def add_coordinates(bolig_data: dict) -> dict:
         return bolig_data
     address: str = bolig_data["address"]
     bolig_data["lat"], bolig_data["lng"] = get_coordinates(address)
+    if bolig_data["lat"] == 0 or bolig_data["lng"] == 0:
+        with file_lock:
+            with open("address_errors.json", "r", encoding="utf-8") as f:
+                address_errors_file = json.load(f)
+            if address in address_errors_file:
+                address_errors_file[address] += 1
+            else:
+                address_errors_file[address] = 1
+            with open("address_errors.json", "w", encoding="utf-8") as f:
+                json.dump(address_errors_file, f, indent=4, ensure_ascii=False)
     print(f"Coordinates for {address}: {bolig_data['lat'], bolig_data['lng']}")
     return bolig_data
 
@@ -131,3 +142,10 @@ if __name__ == "__main__":
     # Wait for all threads to finish
     for thread in threads:
         thread.join()
+
+    # Sort the address_errors.json alphabetically
+    with open("address_errors.json", "r", encoding="utf-8") as f:
+        address_errors_file = json.load(f)
+    address_errors_file = dict(sorted(address_errors_file.items()))
+    with open("address_errors.json", "w", encoding="utf-8") as f:
+        json.dump(address_errors_file, f, indent=4, ensure_ascii=False)
