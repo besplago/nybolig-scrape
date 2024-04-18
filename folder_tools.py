@@ -25,6 +25,7 @@ WANTED_DATA: list = [
 UNWANTED_DATA: dict = {
     "lat": 0,
     "lng": 0,
+    "postal_avg_sqm_price": 0,
 }
 
 
