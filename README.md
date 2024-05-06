@@ -1,6 +1,8 @@
 # Nybolig Bolig Scraper
+![Nybolig Logo](https://www.nybolig.dk/-/media/nybolig/billeder-og-videoer/nybolig-presse/nb_4f.jpg?rev=e43a3eadd3264886a0d9c11bce9d5d17)
+
 ## Overview
-This project is designed to scrape data, floor plans, and images from the Nybolig website (https://www.nybolig.dk/). The scraper is implemented in Python and utilizes the BeautifulSoup library for parsing HTML.
+This project is designed to scrape data, floor plans, and images from the Nybolig website ([https://www.nybolig.dk/](nybolig.dk/)). The scraper is implemented in Python and utilizes the BeautifulSoup library for parsing HTML.
 
 ## Installation
 1. Clone the repository `git clone https://github.com/besplago/nybolig-scrape`
@@ -26,4 +28,3 @@ Adjust the settings in the `config.json` file to customize the scraper behavior.
 Once you've configured the settings, you can run the scraper using the following command:
 ```bash
 python main.py
-```

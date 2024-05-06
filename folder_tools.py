@@ -39,7 +39,7 @@ def remove_empty_folders(path):
                 print(f"Removed folder: {dir_path}")
 
 
-def rename_folders(path):
+def rename_folders(path: str) -> None:
     """Renames folders with spaces and replaces them with underscores"""
     for root, dirs, _ in os.walk(path, topdown=False):
         for name in dirs:
@@ -51,10 +51,10 @@ def rename_folders(path):
                 print(f"Renamed folder: {dir_path} to {new_path}")
 
 
-def remove_empty_data() -> None:
+def remove_empty_data(path: str) -> None:
     """Removes any folders with an empty data.json file."""
     count: int = 0
-    for root, dirs, _ in os.walk("output", topdown=False):
+    for root, dirs, _ in os.walk(path, topdown=False):
         for name in dirs:
             dir_path = os.path.join(root, name)
             data_path = os.path.join(dir_path, "data.json")
@@ -123,8 +123,9 @@ def list_missing_data() -> None:
 
 
 if __name__ == "__main__":
-    remove_empty_data()
-    remove_unwanted_data()
-    list_missing_data()
-    with open("address_errors.json", "w", encoding="utf-8") as file:
-        json.dump({}, file, indent=4, ensure_ascii=False)
+    rename_folders("output")
+    # remove_empty_data("output")
+    # remove_unwanted_data()
+    # list_missing_data()
+    # with open("address_errors.json", "w", encoding="utf-8") as file:
+    #     json.dump({}, file, indent=4, ensure_ascii=False)
